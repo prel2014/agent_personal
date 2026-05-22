@@ -27,7 +27,15 @@ class ToolAccessPolicy:
         *,
         sandbox_only: bool = True,
     ) -> set[str] | None:
-        if spec.tool_access == "full":
+        return self.allowed_tool_names(spec.tool_access, sandbox_only=sandbox_only)
+
+    def allowed_tool_names(
+        self,
+        tool_access: str,
+        *,
+        sandbox_only: bool = True,
+    ) -> set[str] | None:
+        if tool_access == "full":
             if not sandbox_only:
                 return None
             return {
@@ -35,7 +43,7 @@ class ToolAccessPolicy:
                 for name, category in self.tool_categories.items()
                 if category in SANDBOX_TOOL_CATEGORIES or category == EXECUTE
             }
-        if spec.tool_access == "none":
+        if tool_access == "none":
             return set()
 
         return {
@@ -50,13 +58,14 @@ class RoleRuntimeView:
         self,
         runtime: ToolRuntimePort,
         *,
-        role: AgentRole,
+        role: AgentRole | str,
         directive: str,
         allowed_tools: set[str] | None,
         sandbox_only: bool = True,
     ) -> None:
         self.runtime = runtime
         self.role = role
+        self.role_name = role.value if isinstance(role, AgentRole) else role
         self.directive = directive
         self.allowed_tools = allowed_tools
         self.sandbox_only = sandbox_only
@@ -78,12 +87,12 @@ class RoleRuntimeView:
         visible_tools = self._visible_tool_names(context)
         context["available_tools"] = visible_tools
         context["tool_categories"] = self._visible_tool_categories(context, visible_tools)
-        context["agent_role"] = self.role.value
+        context["agent_role"] = self.role_name
         context["role_directive"] = self.directive
-        context["prompt_mode"] = self.role.value
+        context["prompt_mode"] = self.role_name
         context["orchestration"] = {
             "enabled": True,
-            "role": self.role.value,
+            "role": self.role_name,
             "visible_tools": visible_tools,
         }
         context["sandbox"] = {
@@ -115,7 +124,7 @@ class RoleRuntimeView:
                 "success": False,
                 "result": None,
                 "error": (
-                    f"La tool '{name}' no esta disponible para el rol '{self.role.value}'."
+                    f"La tool '{name}' no esta disponible para el rol '{self.role_name}'."
                 ),
             }
         return self.runtime.call_tool(name, arguments)

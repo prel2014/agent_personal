@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
@@ -78,7 +78,7 @@ def _bottom_toolbar(ctx: "CommandContext"):
     return (
         " / comandos | Ctrl+T thinking:"
         f"{thinking} | Ctrl+Y preguntas:{questions} | {context_text} | "
-        "Tab/Enter: completar | Flechas: navegar"
+        "F2/Ctrl+O objetivos | Ctrl+Alt+Enter si tu terminal lo soporta | Tab/Enter: completar | Flechas: navegar"
     )
 
 
@@ -108,4 +108,47 @@ def _create_key_bindings(ctx: "CommandContext"):
         ctx.client.toggle_auto_answer_questions()
         event.app.invalidate()
 
+    for sequence in _objectives_shortcut_sequences():
+        _bind_objectives_shortcut(key_bindings, sequence)
+
     return key_bindings
+
+
+def _objectives_shortcut_sequences() -> tuple[tuple[str, ...], ...]:
+    return (
+        # Reliable fallbacks for terminals that collapse Ctrl+Alt+Enter into Enter.
+        ("f2",),
+        ("c-o",),
+        # Alt+Enter / terminals that encode Ctrl+Alt+Enter as Esc+Enter.
+        ("escape", "enter"),
+        # CSI u: Ctrl+Alt+Enter = ESC [ 13 ; 7 u
+        ("escape", "[", "1", "3", ";", "7", "u"),
+        # xterm modifyOtherKeys: Ctrl+Alt+Enter = ESC [ 27 ; 7 ; 13 ~
+        ("escape", "[", "2", "7", ";", "7", ";", "1", "3", "~"),
+        # Some terminals use a shorter tilde form.
+        ("escape", "[", "1", "3", ";", "7", "~"),
+    )
+
+
+def _bind_objectives_shortcut(key_bindings, keys: tuple[str, ...]) -> None:
+    try:
+        key_bindings.add(*keys)(_open_objectives_panel)
+    except ValueError:
+        return None
+
+
+async def _open_objectives_panel(event) -> None:
+    from .objectives import read_objectives_panel_async
+
+    objective_text = await read_objectives_panel_async()
+    _insert_objective_text(event.current_buffer, objective_text)
+    event.app.invalidate()
+
+
+def _insert_objective_text(buffer, objective_text: str | None) -> None:
+    if not objective_text:
+        return
+
+    if buffer.text and not buffer.text.endswith("\n"):
+        buffer.insert_text("\n\n")
+    buffer.insert_text(objective_text)

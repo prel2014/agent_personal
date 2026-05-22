@@ -75,10 +75,6 @@ class LocalToolRuntime:
                 "ollama_base_url": self.config.vision_ollama_base_url,
             },
             "tool_confirmation_mode": self.config.tool_confirmation_mode,
-            "kv_cache": {
-                "enabled": self.config.kv_cache_enabled,
-                "db_path": self.config.kv_cache_db_path,
-            },
             "recent_tool_event_count": len(self.audit_trail.events),
         }
 
@@ -110,7 +106,6 @@ class LocalToolRuntime:
             "base_dir": str(self.config.base_dir),
             "encoding": self.config.encoding,
             "permissions": self.permissions.summary(),
-            "runtime_policy": self.permissions.summary(),
             "available_tools": [tool["name"] for tool in self.list_tools()],
             "tool_categories": {
                 tool["name"]: tool["category"]
@@ -120,8 +115,6 @@ class LocalToolRuntime:
             },
             "detected_languages": self.project_profile["detected_languages"],
             "primary_language": self.project_profile["primary_language"],
-            "language_markers": self.project_profile["markers"],
-            "language_file_counts": self.project_profile["file_counts"],
             "tooling": self.project_profile["tooling"],
             "sandbox": {
                 "backend": self.config.sandbox_backend,
@@ -141,16 +134,11 @@ class LocalToolRuntime:
                 "required_tools": sorted(self.permissions.confirmation_required_tools),
                 "approved_tools": sorted(self.permissions.approved_sensitive_tools),
             },
-            "kv_cache": {
-                "enabled": self.config.kv_cache_enabled,
-                "db_path": self.config.kv_cache_db_path,
-            },
             "untrusted_tools": sorted(self.UNTRUSTED_RESULT_TOOL_NAMES),
             "location_hint": (
                 "Las referencias como 'aqui', 'aca', 'esta carpeta' o "
                 "'directorio actual' se refieren a base_dir."
             ),
-            "prompts": self.list_prompts(),
         }
         return AgentExecutionContext.from_runtime_context(context).to_wire()
 

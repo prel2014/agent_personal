@@ -49,7 +49,7 @@ class ConsoleREPLController:
         )
         if session.prompt_session is not None:
             session.client.renderer.print_line(
-                "Atajos: Ctrl+T alterna thinking, Ctrl+Y alterna auto-preguntas. Respaldo: /thinking y /questions.",
+                "Atajos: Ctrl+T thinking, Ctrl+Y auto-preguntas, F2/Ctrl+O objetivos. Ctrl+Alt+Enter depende del terminal. Respaldo: /thinking y /questions.",
                 style="dim" if session.client.renderer.rich_output else None,
             )
         else:

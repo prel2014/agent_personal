@@ -84,9 +84,9 @@ class AgentExecutionContext(BaseModel):
 
     def to_wire(self) -> dict[str, Any]:
         if hasattr(self, "model_dump"):
-            payload = self.model_dump(exclude_none=True)
+            payload = self.model_dump(exclude_none=True, exclude_defaults=True)
         else:
-            payload = self.dict(exclude_none=True)
+            payload = self.dict(exclude_none=True, exclude_defaults=True)
 
         extra = payload.pop("extra", {}) or {}
         return {**payload, **extra}
