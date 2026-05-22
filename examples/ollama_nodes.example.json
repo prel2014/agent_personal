@@ -1,0 +1,28 @@
+{
+  "nodes": [
+    {
+      "id": "planner-remote",
+      "base_url": "http://192.168.1.20:11434",
+      "model": "qwen2.5:7b-instruct-q4_K_M",
+      "roles": ["planner"],
+      "priority": 10,
+      "enabled": true
+    },
+    {
+      "id": "worker-remote",
+      "base_url": "http://192.168.1.21:11434",
+      "model": "deepseek-coder:6.7b-instruct-q4_K_M",
+      "roles": ["worker"],
+      "priority": 10,
+      "enabled": true
+    },
+    {
+      "id": "reviewer-remote",
+      "base_url": "http://192.168.1.22:11434",
+      "model": "llama3.1:8b-instruct-q4_K_M",
+      "roles": ["reviewer"],
+      "priority": 10,
+      "enabled": true
+    }
+  ]
+}

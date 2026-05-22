@@ -1,0 +1,38 @@
+services:
+  sandbox_proxy:
+    image: mcp-sandbox:local
+    build:
+      context: .
+      dockerfile: docker/sandbox/Dockerfile
+    command: ["python", "-m", "src.mcp.sandbox.proxy"]
+    environment:
+      MCP_SANDBOX_PROXY_PORT: "8080"
+    networks:
+      - sandbox_internal
+      - sandbox_egress
+
+  sandbox_worker:
+    image: mcp-sandbox:local
+    build:
+      context: .
+      dockerfile: docker/sandbox/Dockerfile
+    command: ["python", "-m", "src.mcp.sandbox.worker", "/sandbox/request.json", "/sandbox/response.json", "30"]
+    environment:
+      HTTP_PROXY: "http://sandbox_proxy:8080"
+      HTTPS_PROXY: "http://sandbox_proxy:8080"
+      http_proxy: "http://sandbox_proxy:8080"
+      https_proxy: "http://sandbox_proxy:8080"
+      NO_PROXY: "localhost,127.0.0.1,::1"
+      no_proxy: "localhost,127.0.0.1,::1"
+    volumes:
+      - ./.mcp_sandbox/manual:/sandbox:rw
+    networks:
+      - sandbox_internal
+    depends_on:
+      - sandbox_proxy
+
+networks:
+  sandbox_internal:
+    internal: true
+  sandbox_egress:
+    driver: bridge

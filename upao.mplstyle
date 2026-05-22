@@ -1,0 +1,40 @@
+# upao.mplstyle
+
+figure.figsize: 10, 5.5
+figure.dpi: 120
+savefig.dpi: 180
+savefig.bbox: tight
+savefig.facecolor: white
+
+font.family: sans-serif
+font.size: 11
+
+axes.facecolor: white
+axes.edgecolor: "#005FAE"
+axes.linewidth: 1.1
+axes.labelcolor: "#1f2937"
+axes.titlesize: 16
+axes.titleweight: bold
+axes.titlecolor: "#005FAE"
+axes.labelsize: 12
+axes.grid: True
+axes.axisbelow: True
+axes.prop_cycle: cycler("color", ["#005FAE", "#FAA74A", "#43B3C0", "#F04C4D", "#765CA7", "#76C043"])
+
+grid.color: "#d7e3f3"
+grid.linestyle: --
+grid.linewidth: 0.8
+grid.alpha: 0.9
+
+lines.linewidth: 2.4
+lines.markersize: 6
+
+xtick.color: "#374151"
+ytick.color: "#374151"
+xtick.labelsize: 10
+ytick.labelsize: 10
+
+legend.frameon: False
+legend.fontsize: 10
+
+patch.edgecolor: white

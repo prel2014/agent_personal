@@ -1,0 +1,20 @@
+# Dependencia usada por los modelos de tools
+pydantic>=1.10,<3
+
+# Render de Markdown, colores y syntax highlighting en el CLI
+rich>=13.7,<15
+
+# Sesion interactiva con autocompletado en el REPL
+prompt_toolkit>=3.0,<4
+
+# Ollama se consume por HTTP desde el proyecto; no requiere paquete Python.
+
+# Comunicacion serial cableada y Bluetooth SPP
+pyserial>=3.5,<4
+
+# Lectura de imagenes, camaras web y streams RTSP/HTTP
+opencv-python>=4.9,<5
+
+# Lectura de archivos tabulares usados por data_tools
+pandas>=2.2,<3
+openpyxl>=3.1,<4
