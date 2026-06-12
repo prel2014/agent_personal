@@ -184,6 +184,45 @@ def load_client_config(args: argparse.Namespace | None = None) -> ClientConfig:
     )
     if context_trim_min_turns < 1:
         raise ValueError("MCP_CLIENT_CONTEXT_TRIM_MIN_TURNS debe ser mayor o igual a 1.")
+    active_skill = (
+        getattr(args, "skill", None)
+        or os.getenv("MCP_CLIENT_ACTIVE_SKILL")
+        or None
+    )
+    memory_project_enabled = (
+        getattr(args, "memory_project_enabled", None)
+        if getattr(args, "memory_project_enabled", None) is not None
+        else read_bool_env("MCP_CLIENT_MEMORY_PROJECT_ENABLED", default=True)
+    )
+    if getattr(args, "no_memory", False):
+        memory_project_enabled = False
+    memory_project_db_path = (
+        getattr(args, "memory_project_db_path", None)
+        or os.getenv("MCP_CLIENT_MEMORY_PROJECT_DB_PATH")
+        or ".mcp_memory/project.sqlite"
+    )
+    memory_user_enabled = (
+        getattr(args, "memory_user_enabled", None)
+        if getattr(args, "memory_user_enabled", None) is not None
+        else read_bool_env("MCP_CLIENT_MEMORY_USER_ENABLED", default=True)
+    )
+    if getattr(args, "no_memory", False):
+        memory_user_enabled = False
+    memory_user_db_path = (
+        getattr(args, "memory_user_db_path", None)
+        or os.getenv("MCP_CLIENT_MEMORY_USER_DB_PATH")
+        or "~/.mcp_memory/user.sqlite"
+    )
+    memory_embedding_enabled = (
+        getattr(args, "memory_embedding_enabled", None)
+        if getattr(args, "memory_embedding_enabled", None) is not None
+        else read_bool_env("MCP_CLIENT_MEMORY_EMBEDDING_ENABLED", default=False)
+    )
+    memory_top_k = int(
+        getattr(args, "memory_top_k", None)
+        or os.getenv("MCP_CLIENT_MEMORY_TOP_K")
+        or 3
+    )
     auto_session_title = read_bool_env("MCP_CLIENT_AUTO_SESSION_TITLE", default=True)
     allow_remote_sensitive_tracing = (
         getattr(args, "allow_remote_sensitive_tracing", None)
@@ -233,4 +272,11 @@ def load_client_config(args: argparse.Namespace | None = None) -> ClientConfig:
         context_auto_trim=context_auto_trim,
         context_trim_ratio=context_trim_ratio,
         context_trim_min_turns=context_trim_min_turns,
+        active_skill=active_skill,
+        memory_project_enabled=memory_project_enabled,
+        memory_project_db_path=memory_project_db_path,
+        memory_user_enabled=memory_user_enabled,
+        memory_user_db_path=memory_user_db_path,
+        memory_embedding_enabled=memory_embedding_enabled,
+        memory_top_k=memory_top_k,
     )

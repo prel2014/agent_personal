@@ -72,11 +72,25 @@ class SafetyContextProvider:
         )
 
 
+@dataclass(frozen=True)
+class SkillMemoryContextProvider:
+    name: str = "skill_memory"
+
+    def build(self, context: AgentExecutionContext) -> dict[str, Any]:
+        return _compact(
+            {
+                "active_skill": context.active_skill,
+                "memories": context.memories,
+            }
+        )
+
+
 DEFAULT_CONTEXT_PROVIDERS: tuple[ContextProvider, ...] = (
     RuntimeContextProvider(),
     ToolContextProvider(),
     SubagentContextProvider(),
     SafetyContextProvider(),
+    SkillMemoryContextProvider(),
 )
 
 

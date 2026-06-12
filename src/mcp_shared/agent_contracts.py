@@ -73,6 +73,8 @@ class AgentExecutionContext(BaseModel):
     tooling: dict[str, Any] = Field(default_factory=dict)
     location_hint: str | None = None
     prompts: list[dict[str, Any]] = Field(default_factory=list)
+    active_skill: dict[str, Any] = Field(default_factory=dict)
+    memories: list[dict[str, Any]] = Field(default_factory=list)
     extra: dict[str, Any] = Field(default_factory=dict)
 
     @classmethod

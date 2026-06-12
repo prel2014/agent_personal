@@ -62,6 +62,8 @@ class RoleRuntimeView:
         directive: str,
         allowed_tools: set[str] | None,
         sandbox_only: bool = True,
+        active_skill: dict[str, Any] | None = None,
+        memories: list[dict[str, Any]] | None = None,
     ) -> None:
         self.runtime = runtime
         self.role = role
@@ -69,6 +71,8 @@ class RoleRuntimeView:
         self.directive = directive
         self.allowed_tools = allowed_tools
         self.sandbox_only = sandbox_only
+        self._active_skill = active_skill
+        self._memories = memories
 
     def list_ollama_tools(self) -> list[dict[str, object]]:
         tools = self.runtime.list_ollama_tools()
@@ -99,6 +103,10 @@ class RoleRuntimeView:
             "mode": "sandbox" if self.sandbox_only else "host",
             "outside_sandbox_allowed": not self.sandbox_only,
         }
+        if self._active_skill:
+            context["active_skill"] = self._active_skill
+        if self._memories:
+            context["memories"] = self._memories
         return AgentExecutionContext.from_runtime_context(context).to_wire()
 
     def call_tool(

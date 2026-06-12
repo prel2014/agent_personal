@@ -53,7 +53,104 @@ def dispatch_command(client, args: argparse.Namespace, parser: argparse.Argument
             continue_session=args.continue_session,
         )
 
+    if args.command == "skills":
+        return _dispatch_skills_command(client, args)
+
+    if args.command == "memory":
+        return _dispatch_memory_command(client, args)
+
     parser.print_help()
+    return 1
+
+
+def _dispatch_skills_command(client, args: argparse.Namespace) -> int:
+    if args.skills_command == "list":
+        catalog = client.list_skills()
+        if not catalog:
+            client.renderer.print_line("No hay skills disponibles.")
+            return 0
+        active = getattr(client, "active_skill", None)
+        for entry in catalog:
+            name = entry.get("name", "")
+            desc = entry.get("description", "")
+            scope = entry.get("scope", "all")
+            marker = " [activo]" if name == active else ""
+            client.renderer.print_line(f"  {name}{marker}  ({scope})  — {desc}")
+        return 0
+
+    if args.skills_command == "show":
+        skill = client.skill_registry.get(args.name)
+        if skill is None:
+            client.renderer.print_line(f"Skill desconocido: '{args.name}'")
+            return 1
+        client.renderer.print_line(
+            f"name: {skill.name}\ndescription: {skill.description}\n"
+            f"scope: {skill.scope}\nsource: {skill.source}\n\n{skill.directive}"
+        )
+        return 0
+
+    return 1
+
+
+def _dispatch_memory_command(client, args: argparse.Namespace) -> int:
+    provider = getattr(client, "memory_provider", None)
+
+    if args.memory_command == "list":
+        if provider is None:
+            client.renderer.print_line("Memoria desactivada.")
+            return 0
+        entries = []
+        if provider.project_store is not None:
+            for e in provider.project_store.list_memories(limit=100):
+                entries.append(("proyecto", e.get("key", ""), e.get("value", "")))
+        if provider.user_store is not None:
+            for e in provider.user_store.list_memories(limit=100):
+                entries.append(("usuario", e.get("key", ""), e.get("value", "")))
+        if not entries:
+            client.renderer.print_line("No hay memorias almacenadas.")
+        for scope, key, value in entries:
+            client.renderer.print_line(f"  [{scope}] {key}: {value}")
+        return 0
+
+    if args.memory_command == "add":
+        if provider is None or provider.project_store is None:
+            client.renderer.print_line("Memoria de proyecto desactivada.")
+            return 1
+        value = " ".join(args.value)
+        provider.project_store.remember(args.key, value)
+        client.renderer.print_line(f"Memoria guardada: '{args.key}' = '{value}'")
+        return 0
+
+    if args.memory_command == "forget":
+        if provider is None or provider.project_store is None:
+            client.renderer.print_line("Memoria de proyecto desactivada.")
+            return 1
+        result = provider.project_store.forget(args.key)
+        deleted = result.get("deleted", 0)
+        msg = f"Memoria '{args.key}' eliminada." if deleted else f"No se encontró '{args.key}'."
+        client.renderer.print_line(msg)
+        return 0
+
+    if args.memory_command == "search":
+        if provider is None:
+            client.renderer.print_line("Memoria desactivada.")
+            return 0
+        query = " ".join(args.query)
+        results = provider.recall(query)
+        if not results:
+            client.renderer.print_line(f"Sin resultados para: '{query}'")
+        for r in results:
+            client.renderer.print_line(f"  {r.get('key', '')}: {r.get('value', '')}")
+        return 0
+
+    if args.memory_command == "clear":
+        if provider is None or provider.project_store is None:
+            client.renderer.print_line("Memoria de proyecto desactivada.")
+            return 1
+        provider.project_store._store.clear(namespace="memories")
+        client.renderer.print_line("Memoria de proyecto vaciada.")
+        return 0
+
     return 1
 
 

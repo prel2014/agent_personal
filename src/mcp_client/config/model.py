@@ -45,6 +45,13 @@ class ClientConfig:
     context_auto_trim: bool = True
     context_trim_ratio: float = 0.75
     context_trim_min_turns: int = 2
+    active_skill: str | None = None
+    memory_project_enabled: bool = True
+    memory_project_db_path: str = ".mcp_memory/project.sqlite"
+    memory_user_enabled: bool = True
+    memory_user_db_path: str = "~/.mcp_memory/user.sqlite"
+    memory_embedding_enabled: bool = False
+    memory_top_k: int = 3
 
     @classmethod
     def from_sources(cls, args: argparse.Namespace | None = None) -> "ClientConfig":

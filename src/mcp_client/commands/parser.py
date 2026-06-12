@@ -107,4 +107,22 @@ def build_parser() -> argparse.ArgumentParser:
     )
     ask_parser.add_argument("prompt", nargs="+", help="Prompt del usuario.")
 
+    skills_parser = subparsers.add_parser("skills", help="Gestiona skills del agente.")
+    skills_subparsers = skills_parser.add_subparsers(dest="skills_command", required=True)
+    skills_subparsers.add_parser("list", help="Lista skills disponibles.")
+    skills_show_p = skills_subparsers.add_parser("show", help="Muestra un skill.")
+    skills_show_p.add_argument("name", help="Nombre del skill.")
+
+    memory_parser = subparsers.add_parser("memory", help="Gestiona la memoria persistente del agente.")
+    memory_subparsers = memory_parser.add_subparsers(dest="memory_command", required=True)
+    memory_subparsers.add_parser("list", help="Lista todas las memorias (proyecto y usuario).")
+    mem_add = memory_subparsers.add_parser("add", help="Guarda una memoria de proyecto.")
+    mem_add.add_argument("key", help="Clave de la memoria.")
+    mem_add.add_argument("value", nargs="+", help="Valor de la memoria.")
+    mem_forget = memory_subparsers.add_parser("forget", help="Elimina una memoria de proyecto.")
+    mem_forget.add_argument("key", help="Clave de la memoria.")
+    mem_search = memory_subparsers.add_parser("search", help="Busca memorias por query.")
+    mem_search.add_argument("query", nargs="+", help="Query de busqueda.")
+    memory_subparsers.add_parser("clear", help="Borra todas las memorias de proyecto.")
+
     return parser

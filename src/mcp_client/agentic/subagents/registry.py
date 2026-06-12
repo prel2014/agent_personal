@@ -3,8 +3,14 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Iterable
 
+from ..frontmatter import parse_frontmatter, parse_tools, split_frontmatter
 from ..roles import PLANNER_DIRECTIVE, REVIEWER_DIRECTIVE, WORKER_DIRECTIVE
 from .models import SubagentSpec, ToolAccess
+
+# Aliases privados para compatibilidad con código existente que llama a las funciones internas
+_split_frontmatter = split_frontmatter
+_parse_frontmatter = parse_frontmatter
+_parse_tools = parse_tools
 
 
 READ_TOOLS = (
@@ -124,8 +130,8 @@ class SubagentRegistry:
 
 def load_subagent_file(path: Path) -> SubagentSpec:
     text = path.read_text(encoding="utf-8")
-    frontmatter, body = _split_frontmatter(text)
-    data = _parse_frontmatter(frontmatter)
+    frontmatter, body = split_frontmatter(text)
+    data = parse_frontmatter(frontmatter)
     name = data.get("name") or path.stem
     description = data.get("description")
     if not description:
@@ -136,7 +142,7 @@ def load_subagent_file(path: Path) -> SubagentSpec:
         raise ValueError(f"tool_access invalido en {path}: {tool_access}")
 
     raw_tools = data.get("tools")
-    tools = _parse_tools(raw_tools)
+    tools = parse_tools(raw_tools)
     directive = body.strip()
     if not directive:
         raise ValueError(f"Subagente sin cuerpo/directive: {path}")
@@ -150,39 +156,3 @@ def load_subagent_file(path: Path) -> SubagentSpec:
         built_in=False,
         source=str(path),
     )
-
-
-def _split_frontmatter(text: str) -> tuple[str, str]:
-    normalized = text.replace("\r\n", "\n")
-    if not normalized.startswith("---\n"):
-        raise ValueError("El archivo de subagente debe iniciar con frontmatter YAML.")
-    _, rest = normalized.split("---\n", 1)
-    if "\n---\n" not in rest:
-        raise ValueError("Frontmatter de subagente sin cierre ---.")
-    frontmatter, body = rest.split("\n---\n", 1)
-    return frontmatter, body
-
-
-def _parse_frontmatter(frontmatter: str) -> dict[str, str]:
-    data: dict[str, str] = {}
-    for line in frontmatter.splitlines():
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#"):
-            continue
-        if ":" not in stripped:
-            raise ValueError(f"Linea de frontmatter invalida: {line}")
-        key, value = stripped.split(":", 1)
-        data[key.strip()] = value.strip().strip('"').strip("'")
-    return data
-
-
-def _parse_tools(raw_tools: str | None) -> tuple[str, ...] | None:
-    if raw_tools is None or raw_tools == "":
-        return None
-    if raw_tools in {"[]", "()"}:
-        return ()
-    value = raw_tools.strip()
-    if value.startswith("[") and value.endswith("]"):
-        value = value[1:-1]
-    tools = tuple(tool.strip().strip('"').strip("'") for tool in value.split(","))
-    return tuple(tool for tool in tools if tool)

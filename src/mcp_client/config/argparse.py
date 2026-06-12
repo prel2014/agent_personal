@@ -145,5 +145,26 @@ def add_client_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentPa
         default=None,
         help="Oculta el medidor estimado de uso de ventana de contexto.",
     )
+    parser.add_argument(
+        "--skill",
+        dest="skill",
+        metavar="NAME",
+        default=None,
+        help="Activa un skill por nombre en esta sesion (ej: --skill concise-responder).",
+    )
+    parser.add_argument(
+        "--no-memory",
+        dest="no_memory",
+        action="store_true",
+        default=False,
+        help="Desactiva la inyeccion automatica de memoria en esta sesion.",
+    )
+    parser.add_argument(
+        "--memory-top-k",
+        dest="memory_top_k",
+        type=int,
+        default=None,
+        help="Numero de memorias a recuperar por turno (default: 3).",
+    )
 
     return parser

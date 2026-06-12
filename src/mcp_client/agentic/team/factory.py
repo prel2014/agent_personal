@@ -2,14 +2,17 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 from pathlib import Path
+from typing import Any
 
 from ...autowrite.service import AutoWriteService
 from ...config.model import ClientConfig
 from ...integrations.execution import ToolCallProcessor
 from ...render.null import NullRenderer
+from ..memory.provider import MemoryContextProvider
 from ..policies import RoleRuntimeView, ToolAccessPolicy
 from ..ports import OrchestratorPort, RendererPort, ToolRuntimePort
 from ..roles import AgentRole, RoleSpec
+from ..skills import SkillRegistry
 from ..subagents import SelectableToolRuntimeView, SubagentRegistry, SubagentSpec
 from ..turns import ChatTurnRequester
 from ..workflow import AgentWorkflow
@@ -54,6 +57,9 @@ class RoleWorkflowFactory:
     api: OrchestratorPort
     tool_policy: ToolAccessPolicy
     subagent_registry: SubagentRegistry | None = None
+    skill_registry: SkillRegistry | None = None
+    active_skill_name: str | None = None
+    memory_provider: MemoryContextProvider | None = None
 
     def __post_init__(self) -> None:
         if self.subagent_registry is None:
@@ -62,6 +68,14 @@ class RoleWorkflowFactory:
                 (
                     Path.home() / ".mcp_agents",
                     base_dir / ".mcp_agents",
+                )
+            )
+        if self.skill_registry is None:
+            base_dir = self.config.runtime_config.base_dir
+            self.skill_registry = SkillRegistry.from_paths(
+                (
+                    Path.home() / ".mcp_skills",
+                    base_dir / ".mcp_skills",
                 )
             )
 
@@ -75,9 +89,10 @@ class RoleWorkflowFactory:
         max_steps: int,
         sandbox_only: bool = True,
     ) -> AgentWorkflow:
+        effective_directive = self._apply_skill(directive, spec.role)
         runtime_view = self._role_runtime_view(
             role=spec.role,
-            directive=directive,
+            directive=effective_directive,
             tool_access=spec.tool_access,
             requested_tools=None,
             sandbox_only=sandbox_only,
@@ -210,7 +225,38 @@ class RoleWorkflowFactory:
             directive=directive,
             allowed_tools=allowed_tools,
             sandbox_only=sandbox_only,
+            active_skill=self._build_skill_context(),
+            memories=self._recall_memories(directive),
         )
+
+    def _apply_skill(self, directive: str, role: AgentRole | str) -> str:
+        if not self.active_skill_name or self.skill_registry is None:
+            return directive
+        skill = self.skill_registry.get(self.active_skill_name)
+        if skill is None:
+            return directive
+        role_name = role.value if isinstance(role, AgentRole) else role
+        if not skill.applies_to_role(role_name):
+            return directive
+        return f"{directive}\n\n---\nSkill activo [{skill.name}]:\n{skill.directive}"
+
+    def _build_skill_context(self) -> dict[str, Any] | None:
+        if not self.active_skill_name or self.skill_registry is None:
+            return None
+        skill = self.skill_registry.get(self.active_skill_name)
+        if skill is None:
+            return None
+        return {
+            "name": skill.name,
+            "description": skill.description,
+            "scope": skill.scope,
+        }
+
+    def _recall_memories(self, query: str) -> list[dict[str, Any]] | None:
+        if self.memory_provider is None or self.memory_provider.is_empty():
+            return None
+        entries = self.memory_provider.to_context_entries(query[:200])
+        return entries if entries else None
 
     def _build_from_runtime(
         self,

@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from pathlib import Path
 from typing import Any
 
 from src.mcp.cache import SQLiteKVCacheStore
 from src.mcp.runtime import LocalToolRuntime
 
+from ..agentic.memory.provider import MemoryContextProvider
+from ..agentic.memory.store import MemoryStore
+from ..agentic.skills import SkillRegistry
 from ..presentation import PresentationPolicy
 from ..presentation.policy import normalize_output_mode
 from ..render import TerminalRenderer
@@ -39,6 +43,9 @@ class MCPClient(ClientCacheMixin, ClientSessionsMixin, ClientLifecycleMixin):
             if config.kv_cache_enabled
             else None
         )
+        self.skill_registry = self._init_skill_registry()
+        self.active_skill: str | None = config.active_skill
+        self.memory_provider = self._init_memory_provider()
         self.agent_session = self._new_agent_session()
         self.session_store = SQLiteSessionStore(config.session_db_path)
         self.repl_session = ConsoleREPLSession(self)
@@ -46,13 +53,64 @@ class MCPClient(ClientCacheMixin, ClientSessionsMixin, ClientLifecycleMixin):
         self.command_context = self.repl_session.command_context
         self.prompt_session = self.repl_session.prompt_session
 
+    def _init_skill_registry(self) -> SkillRegistry:
+        base_dir = self.config.runtime_config.base_dir
+        return SkillRegistry.from_paths(
+            (Path.home() / ".mcp_skills", base_dir / ".mcp_skills")
+        )
+
+    def _init_memory_provider(self) -> MemoryContextProvider | None:
+        project_store: MemoryStore | None = None
+        user_store: MemoryStore | None = None
+        embedding_enabled = self.config.memory_embedding_enabled
+        ollama_url = getattr(self.config.runtime_config, "ollama_base_url", "http://127.0.0.1:11434")
+
+        if self.config.memory_project_enabled:
+            project_store = MemoryStore(
+                self.config.memory_project_db_path,
+                embedding_enabled=embedding_enabled,
+                ollama_url=ollama_url,
+            )
+
+        if self.config.memory_user_enabled:
+            user_db = Path(self.config.memory_user_db_path).expanduser()
+            user_store = MemoryStore(
+                user_db,
+                embedding_enabled=embedding_enabled,
+                ollama_url=ollama_url,
+            )
+
+        if project_store is None and user_store is None:
+            return None
+        return MemoryContextProvider(
+            project_store=project_store,
+            user_store=user_store,
+            top_k=self.config.memory_top_k,
+        )
+
     def _new_agent_session(self) -> AgentSession:
         return AgentSession(
             config=self.config,
             runtime=self.runtime,
             renderer=self.renderer,
             api=self.api,
+            skill_registry=self.skill_registry,
+            active_skill_name=self.active_skill,
+            memory_provider=self.memory_provider,
         )
+
+    def activate_skill(self, name: str) -> None:
+        if self.skill_registry.get(name) is None:
+            raise ValueError(f"Skill desconocido: '{name}'. Usa /skills list para ver disponibles.")
+        self.active_skill = name
+        self.agent_session = self._new_agent_session()
+
+    def deactivate_skill(self) -> None:
+        self.active_skill = None
+        self.agent_session = self._new_agent_session()
+
+    def list_skills(self) -> list[dict[str, object]]:
+        return self.skill_registry.catalog()
 
     def info(self) -> dict[str, Any]:
         return {

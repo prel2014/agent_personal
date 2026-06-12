@@ -28,6 +28,8 @@ namespaces = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "-p no:mock_serial --basetemp=.pytest_tmp"
+tmp_path_retention_policy = "failed"
 norecursedirs = [
     ".git",
     ".pytest_cache",

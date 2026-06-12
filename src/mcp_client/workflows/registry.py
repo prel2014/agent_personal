@@ -1,17 +1,30 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from ..agentic.team import AgentTeamOrchestrator
-from ..agentic.policies import DirectAnswerRuntimeView
+from ..agentic.policies import DirectAnswerRuntimeView, ToolAccessPolicy
 from ..agentic.routing import PlanningRouter
+from ..agentic.team.factory import RoleWorkflowFactory
 from ..agentic.workflow import AgentWorkflow
 from ..autowrite.service import AutoWriteService
 from ..integrations.execution import ToolCallProcessor
 from ..config.model import ClientConfig
 from ..agentic.ports import OrchestratorPort, RendererPort, ToolRuntimePort
 from .tracing import WorkflowTraceService
+
+if TYPE_CHECKING:
+    from ..agentic.memory.provider import MemoryContextProvider
+    from ..agentic.skills import SkillRegistry
+
+
+def _tool_categories_from_runtime(runtime: ToolRuntimePort) -> dict[str, str]:
+    context = runtime.build_context()
+    raw_categories = context.get("tool_categories")
+    if not isinstance(raw_categories, dict):
+        return {}
+    return {k: v for k, v in raw_categories.items() if isinstance(k, str) and isinstance(v, str)}
 
 
 @dataclass
@@ -20,6 +33,9 @@ class WorkflowRegistry:
     runtime: ToolRuntimePort
     renderer: RendererPort
     api: OrchestratorPort
+    skill_registry: SkillRegistry | None = None
+    active_skill_name: str | None = None
+    memory_provider: MemoryContextProvider | None = None
     tool_call_processor: ToolCallProcessor = field(init=False)
     auto_write_service: AutoWriteService = field(init=False)
     workflow: AgentWorkflow = field(init=False)
@@ -64,6 +80,16 @@ class WorkflowRegistry:
                 enabled=False,
             ),
         )
+        tool_policy = ToolAccessPolicy(_tool_categories_from_runtime(self.runtime))
+        workflow_factory = RoleWorkflowFactory(
+            config=self.config,
+            runtime=self.runtime,
+            api=self.api,
+            tool_policy=tool_policy,
+            skill_registry=self.skill_registry,
+            active_skill_name=self.active_skill_name,
+            memory_provider=self.memory_provider,
+        )
         self.team_orchestrator = AgentTeamOrchestrator(
             config=self.config,
             runtime=self.runtime,
@@ -71,6 +97,8 @@ class WorkflowRegistry:
             api=self.api,
             trace_store=self.trace_service.store,
             trace_settings=self.trace_service.settings,
+            tool_policy=tool_policy,
+            workflow_factory=workflow_factory,
         )
         self.planning_router = PlanningRouter(
             api=self.api,
