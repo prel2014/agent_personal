@@ -26,7 +26,10 @@ INITIAL_ROLE_TOOLS: dict[str, set[str]] = {
         "read_lines",
         "search_code",
         "writefile",
-        "replace",
+        "appendfile",
+        "mkdir",
+        "replace_in_file",
+        "replace_lines",
         "movefile",
     },
     "reviewer": {

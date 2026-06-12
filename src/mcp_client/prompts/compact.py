@@ -47,6 +47,6 @@ def build_compact_client_context(ctx: CompactContext) -> dict[str, object]:
 def compacted_context_message(summary: str) -> str:
     return (
         "Resumen compactado de la conversacion anterior. "
-        "Usa este resumen como contexto persistente para continuar:\n\n"
+        "Contexto persistente para continuar:\n\n"
         f"{summary}"
     )

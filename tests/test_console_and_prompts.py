@@ -1,5 +1,6 @@
 from src.mcp_client.console.input import ConsoleInputReader
 from src.mcp_client.prompts import build_compact_prompt, build_routing_classifier_prompt
+from src.mcp_server.ollama.prompt_registry import load_default_prompt_registry
 from src.mcp_server.ollama.prompts import OllamaPromptBuilder
 
 
@@ -43,3 +44,46 @@ def test_ollama_prompt_builder_delegates_mode_rules() -> None:
     assert "Contexto actual del cliente" in prompt
     assert "Produce solo un resumen operativo" in prompt
     assert "No uses herramientas ni tool calls" in prompt
+
+
+def test_ollama_prompt_builder_includes_dynamic_tool_and_subagent_context() -> None:
+    prompt = OllamaPromptBuilder("BASE").build(
+        {
+            "prompt_mode": "worker",
+            "available_tools": ["readfile", "request_tools", "delegate_agent"],
+            "tool_categories": {
+                "readfile": "read",
+                "request_tools": "orchestration",
+                "delegate_agent": "orchestration",
+            },
+            "tool_selection": {
+                "dynamic": True,
+                "active_tools": ["readfile"],
+                "activatable_tools": ["readfile", "python_interpreter"],
+                "inactive_tools": ["python_interpreter"],
+            },
+            "subagents": [
+                {
+                    "name": "code-reviewer",
+                    "description": "Revisa riesgos y regresiones.",
+                    "tool_access": "read_only",
+                }
+            ],
+        }
+    )
+
+    assert "request_tools" in prompt
+    assert "python_interpreter" in prompt
+    assert "delegate_agent" in prompt
+    assert "code-reviewer" in prompt
+    assert "Catalogo de subagentes" in prompt
+
+
+def test_default_prompt_registry_resolves_worker_as_tool_workflow() -> None:
+    registry = load_default_prompt_registry()
+
+    assert registry is not None
+    template = registry.resolve("worker")
+
+    assert template is not None
+    assert template.id == "mcp.tool_workflow"

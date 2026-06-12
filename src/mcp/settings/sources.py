@@ -144,6 +144,21 @@ def build_runtime_config(
         or os.getenv("MCP_CLIENT_KV_CACHE_DB_PATH")
         or DEFAULT_KV_CACHE_DB_PATH
     )
+    kv_embedding_enabled = (
+        getattr(args, "kv_embedding_enabled", None)
+        if getattr(args, "kv_embedding_enabled", None) is not None
+        else read_bool_env("MCP_KV_EMBEDDING_ENABLED", default=False)
+    )
+    kv_embedding_model = (
+        getattr(args, "kv_embedding_model", None)
+        or os.getenv("MCP_KV_EMBEDDING_MODEL")
+        or "nomic-embed-text"
+    )
+    kv_embedding_ollama_url = _optional_str(
+        getattr(args, "kv_embedding_ollama_url", None)
+        or os.getenv("MCP_KV_EMBEDDING_OLLAMA_URL")
+        or os.getenv("OLLAMA_BASE_URL")
+    )
     sandbox_backend = (
         getattr(args, "sandbox_backend", None)
         or os.getenv("MCP_SANDBOX_BACKEND")
@@ -224,6 +239,9 @@ def build_runtime_config(
         approved_sensitive_tools=approved_sensitive_tools,
         kv_cache_enabled=kv_cache_enabled,
         kv_cache_db_path=kv_cache_db_path,
+        kv_embedding_enabled=kv_embedding_enabled,
+        kv_embedding_model=kv_embedding_model,
+        kv_embedding_ollama_url=kv_embedding_ollama_url,
     )
 
 

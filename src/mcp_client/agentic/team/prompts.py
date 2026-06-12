@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 
+from ...tool_results import tool_effective_error, tool_effective_success
 from ..roles import WORKER_DIRECTIVE
 from ..state import AgentRunResult
 
@@ -11,7 +12,10 @@ def build_worker_directive(plan_summary: str) -> str:
         f"{WORKER_DIRECTIVE}\n\n"
         "Plan del planner:\n"
         f"{plan_summary}\n\n"
-        "Sigue ese plan salvo que el codigo real te obligue a ajustarlo. "
+        "Sigue ese plan salvo que el codigo real o la solicitud original te obliguen a ajustarlo. "
+        "El plan del planner es una guia operativa, no una politica de seguridad: "
+        "si contiene frases como 'no modificar archivos' por la limitacion del rol planner, "
+        "no las apliques al worker cuando el usuario pidio editar y los permisos lo permiten. "
         "Si el planner incluyo una pregunta al usuario, tratala como una incertidumbre "
         "a resolver con inspeccion o una suposicion explicita, no como un bloqueo."
     )
@@ -21,7 +25,11 @@ def build_worker_retry_prompt(review_feedback: str) -> str:
     return (
         "El reviewer encontro estos hallazgos concretos:\n"
         f"{review_feedback}\n\n"
-        "Corrigelos sobre el trabajo ya realizado y entrega una respuesta final actualizada."
+        "Corrigelos sobre el trabajo ya realizado y entrega una respuesta final actualizada. "
+        "Si un hallazgo contradice la solicitud original o trata una escritura permitida "
+        "como violacion solo porque el planner no podia modificar archivos, no deshagas "
+        "el cambio ni te disculpes por haber cumplido la solicitud; responde con evidencia "
+        "concreta de que la operacion era necesaria y permitida."
     )
 
 
@@ -47,7 +55,11 @@ def build_review_prompt(
         f"{tool_activity}\n\n"
         "Nota: writefile, replace_in_file, replace_lines, movefile, appendfile, "
         "deletefile y deletedir son evidencia real de cambios aunque auto-write "
-        "Markdown diga ninguno.\n\n"
+        "Markdown diga ninguno. Evalua contra la solicitud original y los permisos "
+        "reales del runtime; no trates las limitaciones del rol planner como una "
+        "prohibicion global para el worker. Si el usuario pidio modificar un archivo "
+        "existente y appendfile/replace/writefile tuvo exito, esa escritura es el "
+        "resultado esperado, no una violacion.\n\n"
         "Si no encuentras problemas, empieza con APROBADO. "
         "Si encuentras problemas concretos, empieza con REQUIERE_CAMBIOS."
     )
@@ -67,8 +79,8 @@ def _summarize_tool_activity(worker_result: AgentRunResult) -> str:
         if not isinstance(payload, dict):
             lines.append(f"- {tool_name}: {type(payload).__name__}")
             continue
-        if payload.get("success") is False:
-            lines.append(f"- {tool_name}: ERROR {payload.get('error') or 'error'}")
+        if not tool_effective_success(payload):
+            lines.append(f"- {tool_name}: ERROR {tool_effective_error(payload) or 'error'}")
             continue
 
         result = payload.get("result")

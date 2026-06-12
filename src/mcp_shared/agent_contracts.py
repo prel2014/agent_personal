@@ -60,6 +60,8 @@ class AgentExecutionContext(BaseModel):
     prompt_mode: str | None = None
     direct_answer_mode: bool = False
     orchestration: dict[str, Any] = Field(default_factory=dict)
+    tool_selection: dict[str, Any] = Field(default_factory=dict)
+    subagents: list[dict[str, Any]] = Field(default_factory=list)
     sandbox: dict[str, Any] = Field(default_factory=dict)
     media_input: dict[str, Any] = Field(default_factory=dict)
     tool_confirmation: dict[str, Any] = Field(default_factory=dict)

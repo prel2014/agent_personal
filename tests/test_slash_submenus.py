@@ -47,6 +47,7 @@ def test_default_router_exposes_subcommand_groups() -> None:
     assert [command.command_path for command in router.list_subcommands("cache")] == [
         ("cache", "get"),
         ("cache", "list"),
+        ("cache", "search"),
         ("cache", "set"),
     ]
     assert router.get_command_path(["cache", "get"]).name == "cache-get"
@@ -58,8 +59,8 @@ def test_completion_suggests_subcommands() -> None:
 
     completions = list(completer.get_completions(Document("/cache "), None))
 
-    assert [completion.text for completion in completions] == ["get ", "list ", "set "]
-    assert [completion.display_text for completion in completions] == ["get", "list", "set"]
+    assert [completion.text for completion in completions] == ["get ", "list ", "search ", "set "]
+    assert [completion.display_text for completion in completions] == ["get", "list", "search", "set"]
 
 
 def test_completion_leaves_space_for_root_command_arguments() -> None:

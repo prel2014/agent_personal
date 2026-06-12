@@ -101,7 +101,7 @@ class TraceRecorder:
                 name=outcome.name,
                 success=outcome.success,
                 duration_ms=outcome.duration_ms,
-                error=outcome.result.get("error"),
+                error=outcome.error,
                 timestamp=_utc_now(),
             )
         )

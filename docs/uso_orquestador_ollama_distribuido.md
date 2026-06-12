@@ -2,55 +2,49 @@
 
 ## Objetivo
 
-Este proyecto permite usar varias maquinas con Ollama instalado como un equipo distribuido de agentes.
+El proyecto permite usar varias maquinas con Ollama como nodos de razonamiento
+para un cliente local. No reparte una sola inferencia entre varias GPUs/RAM; lo
+que distribuye es el trabajo por rol o por seleccion de nodo.
 
-La idea es:
+Responsabilidades:
 
-- El cliente CLI y las tools locales viven en tu maquina principal.
-- El `mcp_server` actua como orquestador central.
-- Cada nodo remoto expone Ollama por HTTP en su red local.
-- El orquestador decide que nodo usa cada rol: `planner`, `worker`, `reviewer`.
-
-No se reparte la RAM de varias PCs para un solo modelo. Lo que se distribuye es el trabajo entre varios nodos.
+- El cliente CLI/REPL vive en la maquina coordinadora y ejecuta las tools.
+- `mcp_server` enruta mensajes HTTP hacia Ollama local o remoto.
+- Cada nodo remoto expone Ollama por HTTP en la LAN.
+- El routing puede usar roles `planner`, `worker`, `reviewer` u otros roles
+  configurados.
 
 ## Arquitectura
 
-Flujo normal:
+Flujo normal con equipo agentico:
 
 1. El cliente envia el prompt al `mcp_server`.
-2. El `planner` razona el plan.
-3. El `worker` ejecuta el cambio usando las tools locales del cliente.
-4. El `reviewer` valida el resultado.
-5. Si el reviewer detecta problemas, el worker recibe feedback y corrige.
+2. El `planner` genera un plan sin tools.
+3. El `worker` inspecciona o modifica el workspace con tools locales.
+4. El `reviewer` valida con lectura.
+5. Si el reviewer pide cambios, el worker recibe feedback y corrige.
 
-El razonamiento puede correr en distintos nodos Ollama, pero las tools de archivos y ejecucion siguen ocurriendo en la maquina cliente.
+El razonamiento puede correr en nodos Ollama distintos. Las operaciones de
+archivos, ejecucion, Git, KV, hardware y web siguen ocurriendo en la maquina
+cliente y pasan por `src/mcp`.
 
 ## Requisitos
 
-- Python instalado en la maquina coordinadora.
-- Ollama instalado en cada nodo remoto.
-- Cada nodo remoto debe ser accesible por HTTP desde la maquina coordinadora.
-- Los modelos necesarios deben estar descargados en cada nodo.
-- El puerto de Ollama debe estar abierto en la LAN.
+- Python 3.10+ en la maquina coordinadora.
+- Ollama instalado y con modelos descargados en cada nodo.
+- Conectividad HTTP desde la coordinadora hacia cada `http://IP:11434`.
+- Firewall abierto para el puerto de Ollama cuando se use LAN.
+- Autenticacion Bearer si `mcp_server` se expone fuera de loopback.
 
-## Preparar Cada Nodo Remoto
+Verificacion por nodo:
 
-En cada maquina remota:
-
-1. Instala Ollama.
-2. Descarga el modelo que vas a asignar a ese nodo.
-3. Asegurate de que Ollama responda por red local.
-4. Verifica desde la maquina coordinadora que puedes abrir `http://IP_DEL_NODO:11434/api/tags`.
-
-El endpoint `/api/tags` debe devolver la lista de modelos disponibles en ese nodo.
+```powershell
+Invoke-RestMethod http://IP_DEL_NODO:11434/api/tags
+```
 
 ## Configuracion Manual De Nodos
 
-Puedes definir los nodos en un JSON y decidir explicitamente que modelo usa cada uno.
-
 Ejemplo base: `examples/ollama_nodes.example.json`.
-
-Ejemplo:
 
 ```json
 {
@@ -60,216 +54,178 @@ Ejemplo:
       "base_url": "http://192.168.1.20:11434",
       "model": "qwen2.5:7b-instruct-q4_K_M",
       "roles": ["planner"],
-      "priority": 10
+      "priority": 10,
+      "enabled": true
     },
     {
       "id": "worker-remote",
       "base_url": "http://192.168.1.21:11434",
       "model": "deepseek-coder:6.7b-instruct-q4_K_M",
       "roles": ["worker"],
-      "priority": 10
-    },
-    {
-      "id": "reviewer-remote",
-      "base_url": "http://192.168.1.22:11434",
-      "model": "llama3.1:8b-instruct-q4_K_M",
-      "roles": ["reviewer"],
-      "priority": 10
+      "priority": 10,
+      "enabled": true
     }
   ]
 }
 ```
 
-Campos importantes:
+Campos:
 
 - `id`: nombre logico del nodo.
 - `base_url`: URL base de Ollama remoto.
-- `model`: modelo que usara ese nodo.
-- `roles`: roles que puede atender.
-- `priority`: prioridad de seleccion. Menor numero = mayor preferencia.
+- `model`: modelo usado en ese nodo.
+- `roles`: roles atendidos por el nodo.
+- `priority`: menor numero gana preferencia.
 - `enabled`: opcional, por defecto `true`.
-- `keep_alive`: opcional.
-- `think`: opcional.
+- `keep_alive`: opcional, se envia a Ollama.
+- `think`: opcional, acepta `true`, `false`, `low`, `medium` o `high`.
 
-## Arrancar El Orquestador
+## Arranque Del Servidor
 
-Ejemplo minimo con nodos manuales:
+Local:
+
+```powershell
+python -m src.mcp_server.server.cli `
+  --host 127.0.0.1 `
+  --port 8000 `
+  --ollama-base-url http://127.0.0.1:11434 `
+  --model auto
+```
+
+LAN con auth y nodos manuales:
 
 ```powershell
 python -m src.mcp_server.server.cli `
   --host 0.0.0.0 `
   --port 8000 `
+  --auth-mode bearer_static `
+  --auth-static-tokens supersecreto `
   --ollama-base-url http://127.0.0.1:11434 `
-  --model qwen3 `
+  --model auto `
   --nodes-config examples/ollama_nodes.example.json
 ```
 
-Notas:
+Si `--model auto`, el servidor intenta seleccionar un modelo local desde
+`/api/tags`. Si no puede, usa un fallback de configuracion.
 
-- El nodo local sigue existiendo como fallback.
-- Si un nodo remoto falla y el fallback local esta habilitado, el orquestador puede volver a tu Ollama local.
-
-Si quieres desactivar el fallback local:
+Para desactivar fallback local cuando falla un remoto:
 
 ```powershell
 python -m src.mcp_server.server.cli `
-  --host 0.0.0.0 `
-  --port 8000 `
   --nodes-config examples/ollama_nodes.example.json `
   --no-local-fallback
 ```
 
-## Descubrimiento Automatico De Nodos
+## Descubrimiento LAN
 
-El servidor puede sondear hosts concretos o rangos CIDR para detectar instancias Ollama disponibles en red.
+Discovery consulta `/api/tags` en hosts o CIDRs y reporta disponibilidad,
+modelos y errores. Respeta TTL, timeout y limite de hosts.
 
-Que hace el descubrimiento:
-
-- Consulta `GET /api/tags` en cada host candidato.
-- Marca si el host esta `reachable`.
-- Reporta `available_models`.
-- Evita enrutar trabajo a nodos configurados que aparecen caidos.
-
-Importante:
-
-- Un nodo descubierto automaticamente no se usa para routing por rol si no esta configurado en el JSON.
-- El descubrimiento sirve para observabilidad, validacion de red y control de disponibilidad.
-- El modelo por rol lo sigues definiendo tu en el archivo JSON.
-
-### Sondeo Por Hosts
+Hosts concretos:
 
 ```powershell
 python -m src.mcp_server.server.cli `
-  --host 0.0.0.0 `
-  --port 8000 `
   --nodes-config examples/ollama_nodes.example.json `
   --discover-nodes `
-  --discovery-hosts 192.168.1.20,192.168.1.21,192.168.1.22 `
+  --discovery-hosts 192.168.1.20,192.168.1.21 `
   --discovery-timeout 1.0 `
   --discovery-ttl-seconds 30
 ```
 
-Tambien puedes pasar URLs completas:
+CIDR:
 
 ```powershell
 python -m src.mcp_server.server.cli `
-  --nodes-config examples/ollama_nodes.example.json `
-  --discover-nodes `
-  --discovery-hosts http://192.168.1.20:11434,http://192.168.1.21:11434
-```
-
-### Sondeo Por Rango CIDR
-
-```powershell
-python -m src.mcp_server.server.cli `
-  --nodes-config examples/ollama_nodes.example.json `
   --discover-nodes `
   --discovery-cidrs 192.168.1.0/24 `
   --discovery-port 11434 `
-  --discovery-max-hosts 64 `
-  --discovery-timeout 1.0
+  --discovery-max-hosts 64
 ```
 
-Flags relevantes:
+Si `--discover-nodes` no recibe hosts ni CIDRs, por defecto intenta inferir la
+LAN local. Puedes desactivar eso con `--no-discovery-auto-lan`.
 
-- `--discover-nodes`
-- `--discovery-hosts`
-- `--discovery-cidrs`
-- `--discovery-port`
-- `--discovery-timeout`
-- `--discovery-ttl-seconds`
-- `--discovery-max-hosts`
+## Auto-Promocion De Nodos Descubiertos
 
-## Consultar Los Nodos Desde El Cliente
-
-Una vez levantado el servidor:
+Por defecto, discovery observa nodos pero no los usa para routing si no estan en
+`nodes-config`. Para convertir nodos descubiertos en candidatos de routing:
 
 ```powershell
-python -m src.mcp_client.commands.cli --server-url http://127.0.0.1:8000 list-nodes
+python -m src.mcp_server.server.cli `
+  --discover-nodes `
+  --auto-promote-discovered-nodes `
+  --auto-promote-roles planner,worker,reviewer `
+  --auto-promote-priority 200 `
+  --auto-promote-max-nodes 16
 ```
 
-Tambien puedes revisar:
+La auto-promocion:
+
+- ignora nodos ya configurados manualmente
+- requiere que el host sea reachable y exponga modelos
+- descarta modelos de embeddings para roles de razonamiento
+- puntua modelos de codigo para `worker`
+- puntua modelos generales/razonamiento para `planner` y `reviewer`
+- crea nodos con `source=auto_promoted`
+
+## Cliente
+
+Consultar nodos:
+
+```powershell
+python -m src.mcp_client.commands.cli `
+  --server-url http://127.0.0.1:8000 `
+  --server-bearer-token supersecreto `
+  list-nodes
+```
+
+Health e info:
 
 ```powershell
 python -m src.mcp_client.commands.cli --server-url http://127.0.0.1:8000 health
 python -m src.mcp_client.commands.cli --server-url http://127.0.0.1:8000 info
 ```
 
-`list-nodes` te mostrara:
-
-- nodos configurados
-- nodos detectados
-- si responden
-- que modelos exponen
-- si son `managed` o `unmanaged`
-
-## Ejecutar Trabajo Con El Cliente
-
-Consulta directa:
+Ejecutar trabajo:
 
 ```powershell
-python -m src.mcp_client.commands.cli --server-url http://127.0.0.1:8000 ask "haz este cambio en el proyecto"
+python -m src.mcp_client.commands.cli `
+  --server-url http://127.0.0.1:8000 `
+  --server-bearer-token supersecreto `
+  ask "haz este cambio en el proyecto"
 ```
 
-Sesion interactiva:
+REPL:
 
 ```powershell
 python -m src.mcp_client.commands.cli --server-url http://127.0.0.1:8000 repl
 ```
 
-Por defecto el cliente usa el flujo orquestado `planner -> worker -> reviewer`.
+## Seleccion De Nodos
 
-En ese flujo:
+El registry resuelve en este orden:
 
-- `planner` no recibe tools. Su responsabilidad es planear y delegar.
-- `worker` ejecuta tools dentro del sandbox por defecto.
-- `reviewer` valida con lectura.
+1. `agent_node_id` explicito en el contexto, si existe y esta disponible.
+2. `agent_role`, buscando nodos no locales que atiendan ese rol.
+3. nodo local por defecto.
 
-El worker solo sale del sandbox si el usuario lo pide explicitamente, por
-ejemplo con "fuera del sandbox", "usa el host" o "sin aislamiento".
+Entre candidatos del mismo rol:
 
-Si quieres desactivarlo y usar un solo agente:
+- se filtran nodos deshabilitados o no reachable cuando discovery esta activo
+- se ordena por `priority` y `node_id`
+- se aplica round-robin por rol entre candidatos equivalentes
 
-```powershell
-python -m src.mcp_client.commands.cli `
-  --server-url http://127.0.0.1:8000 `
-  --no-orchestrate-agents `
-  ask "haz este cambio"
-```
+Si falla la peticion a un remoto durante el inicio y el fallback esta activo,
+el servidor vuelve al nodo local.
 
-## Seleccion De Nodos Y Roles
-
-El routing actual funciona asi:
-
-- `planner` busca un nodo remoto con rol `planner`.
-- `worker` busca un nodo remoto con rol `worker`.
-- `reviewer` busca un nodo remoto con rol `reviewer`.
-- Si no encuentra uno valido, cae al nodo local.
-- Si el nodo remoto falla durante el inicio de la peticion y el fallback esta habilitado, vuelve al nodo local.
-
-Si hay varios nodos para el mismo rol:
-
-- se ordenan por `priority`
-- entre nodos equivalentes se usa round-robin
-
-## Recomendacion Practica De Roles
-
-Con varias maquinas pequenas, una distribucion razonable es:
-
-- `planner`: modelo compacto pero bueno para instrucciones.
-- `worker`: modelo coder/instruct.
-- `reviewer`: modelo estable para validacion y consistencia.
-
-Ejemplo:
-
-- `planner`: Qwen 7B quantizado
-- `worker`: DeepSeek Coder 6.7B quantizado
-- `reviewer`: Llama 8B instruct quantizado
-
-## Variables De Entorno Utiles
+## Variables De Entorno
 
 Servidor:
 
+- `MCP_API_HOST`
+- `MCP_API_PORT`
+- `MCP_SERVER_AUTH_MODE`
+- `MCP_SERVER_AUTH_TOKENS`
 - `MCP_SERVER_NODES_CONFIG`
 - `MCP_SERVER_ALLOW_LOCAL_FALLBACK`
 - `MCP_SERVER_DISCOVERY_ENABLED`
@@ -279,62 +235,47 @@ Servidor:
 - `MCP_SERVER_DISCOVERY_TIMEOUT`
 - `MCP_SERVER_DISCOVERY_TTL_SECONDS`
 - `MCP_SERVER_DISCOVERY_MAX_HOSTS`
+- `MCP_SERVER_AUTO_PROMOTE_DISCOVERED_NODES`
+- `MCP_SERVER_AUTO_PROMOTE_ROLES`
+- `MCP_SERVER_AUTO_PROMOTE_PRIORITY`
+- `MCP_SERVER_AUTO_PROMOTE_MAX_NODES`
+- `OLLAMA_BASE_URL`
+- `OLLAMA_MODEL`
+- `OLLAMA_KEEP_ALIVE`
+- `OLLAMA_REQUEST_TIMEOUT`
 
 Cliente:
 
 - `MCP_SERVER_URL`
-- `MCP_CLIENT_ORCHESTRATE_AGENTS`
+- `MCP_SERVER_BEARER_TOKEN`
+- `MCP_CLIENT_PLANNING_MODE`
+- `MCP_CLIENT_MAX_STEPS`
+- `MCP_CLIENT_OUTPUT_MODE`
+- `MCP_CLIENT_SHOW_THINKING`
 
-## Diagnostico Rapido
+## Diagnostico
 
-Si un nodo no aparece como disponible:
+Si un nodo no aparece:
 
-1. Abre `http://IP:11434/api/tags` desde la maquina coordinadora.
-2. Verifica firewall y conectividad LAN.
-3. Revisa que Ollama este escuchando por red.
-4. Usa `list-nodes` para ver `reachable`, `available_models` y `last_error`.
+1. Abre `http://IP:11434/api/tags` desde la coordinadora.
+2. Revisa firewall, puerto y conectividad LAN.
+3. Usa `list-nodes` para ver `reachable`, `available_models` y `last_error`.
+4. Baja `--discovery-timeout` solo si la red responde rapido; subelo en redes
+   lentas.
 
 Si aparece detectado pero no se usa:
 
-1. Verifica que el nodo este tambien en `nodes-config`.
-2. Revisa que tenga `roles` correctos.
-3. Confirma que el `model` exista realmente en ese nodo.
-4. Comprueba la `priority`.
+1. Verifica que este en `nodes-config` o activa auto-promocion.
+2. Confirma `roles`, `model`, `enabled` y `priority`.
+3. Confirma que el modelo existe en ese nodo.
+4. Revisa si discovery lo marco como no reachable.
 
-## Flujo Recomendado
+## Notas De Seguridad
 
-1. Configura los nodos manuales con modelo y rol.
-2. Activa descubrimiento para validar que realmente estan vivos.
-3. Arranca el servidor.
-4. Ejecuta `list-nodes`.
-5. Lanza una prueba con `ask`.
-6. Ajusta modelos o prioridades segun resultados.
-
-## Estado Actual
-
-Actualmente el sistema ya soporta:
-
-- orquestacion por roles
-- nodos remotos por modelo
-- fallback local
-- autodeteccion de instancias Ollama
-- reporte de nodos disponibles
-
-Lo que no hace automaticamente:
-
-- asignar roles a nodos descubiertos sin configuracion manual
-- elegir un modelo remoto sin que tu lo declares
-- sincronizar archivos entre maquinas
-- repartir una sola inferencia entre varias GPUs o varias RAMs
-
-## Notas De CLI
-
-El render Markdown del REPL requiere salida rich habilitada. Si usas
-`--plain-output`, la respuesta se imprime como texto simple.
-
-El campo `thinking` esta apagado por defecto. Puedes alternarlo en el REPL con
-`Ctrl+T` o con:
-
-```text
-/thinking off
-```
+- Exponer `mcp_server` fuera de loopback requiere auth; el arranque falla si
+  usas `--host 0.0.0.0 --auth-mode off`.
+- `/v1/chat` exige Bearer token cuando `auth_mode=bearer_static`.
+- `/info` y `/nodes` tambien quedan protegidos salvo `--no-auth-for-info`.
+- `/health` es publico por defecto; usa `--private-health` para protegerlo.
+- Las tools y el filesystem no salen del cliente. El servidor no debe recibir
+  secretos salvo que el contexto enviado por el cliente los incluya.

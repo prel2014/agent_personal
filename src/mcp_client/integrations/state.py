@@ -50,6 +50,19 @@ class ClientCacheMixin:
             expired_only=expired_only,
         )
 
+    def cache_search(
+        self,
+        query: str,
+        *,
+        namespace: str | None = None,
+        top_k: int = 5,
+        min_score: float = 0.0,
+    ) -> dict[str, Any]:
+        return self.runtime.call_tool(
+            "kv_search",
+            {"query": query, "namespace": namespace, "top_k": top_k, "min_score": min_score},
+        )
+
     def _require_kv_cache(self) -> SQLiteKVCacheStore:
         if self.kv_cache is None:
             raise RuntimeError("KV cache esta deshabilitado.")

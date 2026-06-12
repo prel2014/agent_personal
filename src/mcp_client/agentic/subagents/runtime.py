@@ -39,6 +39,8 @@ class SelectableToolRuntimeView:
     def build_context(self) -> dict[str, object]:
         context = dict(self.runtime.build_context())
         visible_names = self._visible_tool_names()
+        all_runtime_names = sorted(self._all_runtime_tool_names())
+        inactive_names = sorted(set(all_runtime_names) - set(visible_names))
         categories = context.get("tool_categories", {})
         visible_set = set(visible_names)
         visible_categories = (
@@ -66,6 +68,8 @@ class SelectableToolRuntimeView:
         context["tool_selection"] = {
             "dynamic": True,
             "active_tools": visible_names,
+            "activatable_tools": all_runtime_names,
+            "inactive_tools": inactive_names,
             "instruction": (
                 "Si falta una tool necesaria, llama request_tools con los nombres "
                 "exactos y continua; no replantees todo desde cero."

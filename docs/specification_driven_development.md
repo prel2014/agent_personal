@@ -2,86 +2,89 @@
 
 ## Objetivo
 
-Este repo usa Specification-Driven Development (SDD) como contrato compartido
-entre humanos y agentes. La spec no reemplaza los tests ni el codigo: reduce la
-ambiguedad antes de cambiar codigo y deja trazable que comportamiento debe
-mantenerse.
+Este repo usa specs Markdown como contrato compartido entre humanos y agentes.
+La spec no reemplaza tests ni codigo; reduce ambiguedad antes de cambiar un
+subsistema y deja claro que comportamiento debe conservarse.
 
-En este proyecto, SDD aplica a tres subsistemas:
+Specs activas:
 
-- `src/mcp_client`: cliente agente, CLI/REPL, sesiones persistentes, autowrite y trazabilidad.
-- `src/mcp_server`: orquestador HTTP hacia nodos Ollama.
-- `src/mcp`: runtime local de tools, permisos y sandbox web.
+- `src/mcp_client/mcp_client.sdd.md`
+- `src/mcp_server/mcp_server.sdd.md`
+- `src/mcp/mcp_runtime.sdd.md`
 
-## Como Se Lleva A Cabo Con Agentes
+## Autoridad
 
-1. El humano define el objetivo del cambio.
-2. El agente lee `.specdd/bootstrap.md` y la spec del subsistema.
-3. Si la spec no cubre el cambio, primero propone o edita la spec.
-4. El agente implementa el cambio minimo que cumple la spec.
-5. El agente ejecuta el `Test Map` de la spec.
-6. El agente reporta resultado, pruebas y cualquier desviacion.
+Cuando hay conflicto, la autoridad practica es:
 
-La idea clave es que el agente no trabaja solo con prompts libres. Trabaja con
-contratos locales que explican proposito, limites, interfaces publicas, reglas de
-seguridad y criterios de aceptacion.
+1. Instrucciones del usuario y `AGENTS.md`.
+2. Codigo actual y tests existentes.
+3. Spec del subsistema afectado.
+4. README y guias en `docs/`.
+5. Roadmaps o planes historicos.
 
-## Metodologia Adoptada
+Si una spec contradice el codigo actual, el cambio correcto es actualizar la
+spec o agregar pruebas que formalicen la nueva regla antes de depender de ella.
 
-La practica se basa en estas reglas:
+## Subsistemas
 
-- Specs pequenas y cercanas al codigo que describen.
-- Bootstrap global para que cualquier agente sepa como resolver autoridad.
-- Contratos con `Owns` y `Does Not Own` para evitar refactors amplios.
-- Interfaces publicas declaradas antes de modificar codigo.
-- Reglas de seguridad explicitas para permisos, red, sandbox y trazas.
-- `Acceptance Criteria` verificables.
-- `Test Map` conectado a pruebas reales del repo.
+- `src/mcp_client`: cliente agente, CLI/REPL, sesiones persistentes, autowrite,
+  subagentes, prompt routing y trazabilidad.
+- `src/mcp_server`: orquestador HTTP hacia nodos Ollama, auth, discovery,
+  auto-promocion y prompt rendering.
+- `src/mcp`: runtime local de tools, permisos, auditoria, KV, Git, datos,
+  hardware/media y sandbox web.
 
-Para este repo se eligio Markdown con sufijo `.sdd.md`. SpecDD usa normalmente
-archivos `.sdd`; aqui se mantiene `.md` para legibilidad, previews y consistencia
-con la documentacion existente.
-
-## Como Documentaria Cambios Nuevos
-
-Para una feature nueva:
+## Flujo De Trabajo Con Agentes
 
 1. Identificar el subsistema propietario.
-2. Actualizar su `.sdd.md` con la nueva interfaz, reglas y tests esperados.
-3. Implementar codigo.
-4. Agregar o actualizar pruebas.
-5. Actualizar README/docs si cambia el uso publico.
+2. Leer la spec `.sdd.md` de ese subsistema.
+3. Si cambia una interfaz publica, regla de seguridad o modo de fallo,
+   actualizar la spec junto al codigo.
+4. Implementar el cambio minimo que respeta los limites `Owns` y
+   `Does Not Own`.
+5. Ejecutar el `Test Map` actualizado o documentar la limitacion.
+6. Actualizar README/docs si cambia el uso publico.
 
-Para un bug:
+## Como Documentar Cambios
 
-1. Agregar el comportamiento esperado a `Behavior Rules` o `Failure Modes`.
-2. Agregar un criterio de aceptacion que reproduzca el bug.
-3. Implementar el fix.
-4. Agregar test de regresion.
+Feature nueva:
 
-Para seguridad:
+1. Agregar interfaz, reglas y acceptance criteria en la spec propietaria.
+2. Implementar codigo.
+3. Agregar o actualizar pruebas.
+4. Actualizar README/docs si el usuario debe cambiar comandos, flags o flujo.
 
-1. Actualizar primero `Security And Permissions`.
-2. Declarar permisos nuevos como opt-in.
+Bug:
+
+1. Agregar comportamiento esperado a `Behavior Rules` o `Failure Modes`.
+2. Agregar test de regresion.
+3. Implementar fix.
+
+Seguridad:
+
+1. Actualizar `Security And Permissions`.
+2. Mantener permisos peligrosos como opt-in.
 3. Probar denegacion por defecto y caso permitido.
-4. Verificar que no se filtran secretos en trazas o outputs.
+4. Verificar que no se filtran secretos en trazas, sesiones o outputs.
 
-## Specs Del Repo
+## Reglas De Mantenimiento
 
-- `.specdd/bootstrap.md`: reglas globales para agentes.
-- `.specdd/glossary.md`: vocabulario comun.
-- `.specdd/spec-template.sdd.md`: plantilla para specs nuevas.
-- `src/mcp_client/mcp_client.sdd.md`: contrato del cliente agente.
-- `src/mcp_server/mcp_server.sdd.md`: contrato del orquestador HTTP.
-- `src/mcp/mcp_runtime.sdd.md`: contrato del runtime local.
-- `docs/hermes_level_cli_roadmap.md`: hoja de ruta de producto CLI.
+- Mantener specs pequenas y cercanas al codigo.
+- Evitar specs aspiracionales en archivos `.sdd.md`; los roadmaps van en
+  `docs/`.
+- El `Test Map` debe nombrar tests que existen o indicar explicitamente que
+  falta cobertura.
+- No agregar una tool sin categoria de permiso y prueba minima.
+- No agregar flags publicos sin documentarlos en README o en una guia.
 
-## Fuentes Revisadas
+## Fuentes Internas
 
-- [SpecDD](https://specdd.ai/): propone specs locales, bootstrap para agentes y archivos fuente-adjacent como contrato de desarrollo.
-- [OpenAI Codex](https://openai.com/index/introducing-codex/): describe agentes de software que leen, editan y prueban codigo en entornos aislados, con necesidad de revision humana.
-- [OpenAI Codex cloud docs](https://platform.openai.com/docs/codex/overview): documenta delegacion de tareas a Codex en un entorno cloud aislado.
-- [Agentic Coding Handbook: Spec-First Approach](https://tweag.github.io/agentic-coding-handbook/WORKFLOW_SPEC_FIRST_APPROACH/): recomienda empezar con una especificacion clara antes de implementar con agentes.
+- `README.md`: entrada de usuario y comandos principales.
+- `docs/arquitectura_y_operacion.md`: mapa transversal del proyecto.
+- `docs/uso_orquestador_ollama_distribuido.md`: despliegue con Ollama local/LAN.
+- `docs/trazabilidad_dataset_sqlite.md`: persistencia y export de trazas.
+- `docs/plan_sandbox_web_tools.md`: estado y criterios del sandbox web.
+- `docs/hermes_level_cli_roadmap.md`: direccion de producto.
 
 ## Criterio Operativo
 
@@ -89,5 +92,5 @@ Un cambio esta listo cuando:
 
 - La spec afectada describe el comportamiento deseado.
 - El codigo cumple esa spec.
-- Las pruebas del `Test Map` pasan o la limitacion queda documentada.
-- La respuesta final del agente lista cambios, pruebas y riesgos restantes.
+- Las pruebas relevantes pasan o la limitacion queda documentada.
+- La documentacion publica refleja cualquier cambio visible para usuarios.

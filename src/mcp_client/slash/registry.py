@@ -1,6 +1,7 @@
 from .handlers_cache import (
     handle_cache_get,
     handle_cache_list,
+    handle_cache_search,
     handle_cache_set,
 )
 from .handlers_core import (
@@ -231,6 +232,20 @@ def create_default_router() -> SlashCommandRouter:
             examples=("/cache list", "/cache list repo", "/cache-list repo"),
             arg_kinds=(ARG_TEXT,),
             route=("cache", "list"),
+        ),
+        SlashCommand(
+            name="cache-search",
+            summary="Busca entradas del KV cache por similitud semantica o texto.",
+            usage="/cache search <query> [namespace]",
+            category="Cache",
+            handler=handle_cache_search,
+            examples=(
+                "/cache search 'ultimo escaneo de repo'",
+                "/cache search 'estado tests' proyecto",
+                "/cache-search 'version docker'",
+            ),
+            arg_kinds=(ARG_TEXT, ARG_TEXT),
+            route=("cache", "search"),
         ),
         SlashCommand(
             name="exit",

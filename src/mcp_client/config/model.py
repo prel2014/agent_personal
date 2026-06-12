@@ -42,6 +42,9 @@ class ClientConfig:
     context_window_tokens: int = DEFAULT_CONTEXT_WINDOW_TOKENS
     show_context_meter: bool = True
     output_mode: OutputMode = "normal"
+    context_auto_trim: bool = True
+    context_trim_ratio: float = 0.75
+    context_trim_min_turns: int = 2
 
     @classmethod
     def from_sources(cls, args: argparse.Namespace | None = None) -> "ClientConfig":
@@ -77,5 +80,8 @@ class ClientConfig:
             "context_window_tokens": self.context_window_tokens,
             "show_context_meter": self.show_context_meter,
             "output_mode": self.output_mode,
+            "context_auto_trim": self.context_auto_trim,
+            "context_trim_ratio": self.context_trim_ratio,
+            "context_trim_min_turns": self.context_trim_min_turns,
             "runtime": self.runtime_config.to_dict(),
         }

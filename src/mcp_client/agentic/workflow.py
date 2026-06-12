@@ -11,6 +11,7 @@ from .policies import FinalAnswerRuntimeView
 from .ports import OrchestratorPort, RendererPort, ToolRuntimePort
 from .state import AgentRunResult, AgentWorkflowState, ConversationMemory, WorkflowStage
 from .tracing import TraceRecorder
+from .context_window import trim_messages
 from .turns import ChatTurnRequester
 
 
@@ -57,6 +58,14 @@ class AgentWorkflow:
             state.current_step = step
             state.stage = WorkflowStage.REQUESTING_ASSISTANT
             hook_chain.on_stage_changed(state, detail="requesting assistant turn")
+
+            if self.config.context_auto_trim:
+                state.memory.messages, _ = trim_messages(
+                    state.memory.messages,
+                    max_tokens=self.config.context_window_tokens,
+                    ratio=self.config.context_trim_ratio,
+                    min_turns=self.config.context_trim_min_turns,
+                )
 
             response, assistant_message = self.turn_requester.request(step, state.memory)
             state.last_response = response

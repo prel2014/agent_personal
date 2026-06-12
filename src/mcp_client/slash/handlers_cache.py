@@ -24,3 +24,12 @@ def handle_cache_list(ctx: CommandContext, args: list[str]) -> CommandResult:
     namespace = args[0] if args else None
     ctx.renderer.print_json(ctx.client.cache_list(namespace=namespace, limit=100))
     return CommandResult()
+
+
+def handle_cache_search(ctx: CommandContext, args: list[str]) -> CommandResult:
+    if not args:
+        raise ValueError("Uso: /cache search <query> [namespace]")
+    query = args[0]
+    namespace = args[1] if len(args) > 1 else None
+    ctx.renderer.print_json(ctx.client.cache_search(query, namespace=namespace))
+    return CommandResult()

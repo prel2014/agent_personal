@@ -6,6 +6,8 @@ from typing import Any
 
 from src.mcp_shared.contracts import ChatMessage, ChatResponse
 
+from ..tool_results import tool_effective_error, tool_effective_success
+
 
 class WorkflowStage(str, Enum):
     PLANNING = "planning"
@@ -62,7 +64,11 @@ class ToolExecutionOutcome:
 
     @property
     def success(self) -> bool:
-        return bool(self.result.get("success"))
+        return tool_effective_success(self.result)
+
+    @property
+    def error(self) -> str | None:
+        return tool_effective_error(self.result)
 
 
 @dataclass

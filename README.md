@@ -1,41 +1,64 @@
 # RAG / MCP Orquestado Con Ollama
 
-Este proyecto implementa un cliente local con tools, un orquestador HTTP y soporte para usar varias maquinas con Ollama como nodos de razonamiento distribuidos.
+Este proyecto implementa un cliente local con tools, un orquestador HTTP y
+soporte para usar varias maquinas con Ollama como nodos de razonamiento
+distribuidos. El cliente conserva el acceso al workspace local; el servidor
+solo enruta mensajes hacia Ollama y devuelve respuestas compatibles con el
+cliente.
 
 ## Componentes
 
-- `src/mcp_client`: cliente CLI, tools locales y orquestacion `planner -> worker -> reviewer`
-- `src/mcp_server`: servidor HTTP y router hacia nodos Ollama
-- `src/mcp`: runtime local de tools, permisos y contexto
-- `examples/ollama_nodes.example.json`: ejemplo de configuracion de nodos remotos
+- `src/mcp_client`: CLI/REPL, sesiones, slash commands, workflows agenticos,
+  subagentes, autowrite, trazas y renderizado de terminal.
+- `src/mcp_server`: servidor HTTP, autenticacion, routing hacia nodos Ollama,
+  discovery LAN, auto-promocion de nodos y construccion de prompts.
+- `src/mcp`: runtime local de tools, permisos, politicas de ruta, auditoria,
+  KV cache, Git, datos, hardware/media y sandbox web.
+- `src/mcp_shared`: contratos compartidos, serializacion, helpers SQLite,
+  Markdown, URLs y entorno.
+- `prompts/`: registry y secciones Markdown usadas para construir prompts por
+  modo (`tool_workflow`, `planner`, `reviewer`, `direct_answer`, `compact`).
+- `examples/ollama_nodes.example.json`: ejemplo de nodos remotos por rol.
 
-## Casos De Uso
+## Documentacion
 
-- usar un solo nodo Ollama local
-- asignar distintos modelos por rol en varias maquinas
-- autodetectar instancias Ollama disponibles en la red local
-- ejecutar cambios sobre tu workspace local mientras el razonamiento corre en otros equipos
+- [Arquitectura Y Operacion Del Proyecto](docs/arquitectura_y_operacion.md)
+- [Uso Del Orquestador Ollama Distribuido](docs/uso_orquestador_ollama_distribuido.md)
+- [Trazabilidad SQLite Para Dataset](docs/trazabilidad_dataset_sqlite.md)
+- [Specification-Driven Development Para Este Repo](docs/specification_driven_development.md)
+- [Plan De Caja Aislada Para Tools Web](docs/plan_sandbox_web_tools.md)
+- [Fases De Refactor Del Cliente](docs/mcp_client_refactor_phases.md)
+- [Roadmap Hermes-Level CLI](docs/hermes_level_cli_roadmap.md)
 
-## Guia Principal
-
-La documentacion completa de despliegue y uso esta aqui:
-
-[Uso Del Orquestador Ollama Distribuido](docs/uso_orquestador_ollama_distribuido.md)
-
-## Specification-Driven Development
-
-Este repo documenta sus contratos para agentes en `.specdd/` y en specs
-fuente-adjacent por subsistema:
+Specs fuente-adjacent:
 
 - `src/mcp_client/mcp_client.sdd.md`
 - `src/mcp_server/mcp_server.sdd.md`
 - `src/mcp/mcp_runtime.sdd.md`
 
-Guia de uso: [Specification-Driven Development Para Este Repo](docs/specification_driven_development.md)
+## Instalacion
+
+```powershell
+python -m pip install -r requirements.txt
+python -m pip install -e .
+```
+
+El paquete instala el entry point `rag-agent`, equivalente a
+`python -m src.mcp_client.commands.cli`.
 
 ## Inicio Rapido
 
-Servidor:
+Servidor local:
+
+```powershell
+python -m src.mcp_server.server.cli `
+  --host 127.0.0.1 `
+  --port 8000 `
+  --ollama-base-url http://127.0.0.1:11434 `
+  --model auto
+```
+
+Servidor en LAN con Bearer token y nodos remotos:
 
 ```powershell
 python -m src.mcp_server.server.cli `
@@ -45,11 +68,8 @@ python -m src.mcp_server.server.cli `
   --auth-static-tokens supersecreto `
   --nodes-config examples/ollama_nodes.example.json `
   --discover-nodes `
-  --discovery-hosts 192.168.1.20,192.168.1.21,192.168.1.22
+  --discovery-hosts 192.168.1.20,192.168.1.21
 ```
-
-Si no tienes un archivo de nodos, omite `--nodes-config` y usa solo el nodo
-local configurado por `--ollama-base-url` / `--model`.
 
 Cliente:
 
@@ -57,72 +77,65 @@ Cliente:
 python -m src.mcp_client.commands.cli setup
 python -m src.mcp_client.commands.cli --server-bearer-token supersecreto doctor
 python -m src.mcp_client.commands.cli --server-url http://127.0.0.1:8000 list-nodes
-python -m src.mcp_client.commands.cli --server-url http://127.0.0.1:8000 --server-bearer-token supersecreto ask "haz este cambio"
+python -m src.mcp_client.commands.cli --server-url http://127.0.0.1:8000 ask "analiza este repo"
 ```
 
-Si instalas el paquete, el entrypoint equivalente es:
+Con el entry point:
 
 ```powershell
 rag-agent doctor
 rag-agent repl --continue
 ```
 
-## Flujo Agentico Del Cliente
+## Flujo Agentico
 
-El cliente puede enrutar cada prompt a una respuesta directa o al flujo
+El cliente puede responder directo o usar el equipo
 `planner -> worker -> reviewer`, segun `--planning-mode`:
 
-- `auto`: decide segun la solicitud.
+- `auto`: clasifica el prompt y decide.
 - `always`: fuerza el equipo planner/worker/reviewer.
-- `never`: usa respuesta directa sin orquestacion de equipo.
+- `never`: responde directo sin equipo.
 
-Roles:
+Roles principales:
 
-- `planner`: no tiene tools. Produce un plan breve y delega la inspeccion real.
-- `worker`: usa tools dentro del sandbox por defecto. Solo puede salir al host si
-  el usuario lo pide explicitamente con frases como "fuera del sandbox" o "usa el host".
-- `reviewer`: usa lectura para validar el resultado del worker.
+- `planner`: no recibe tools; produce un plan breve.
+- `worker`: ejecuta inspeccion/cambios con tools dinamicas y sandbox-first.
+- `reviewer`: valida con tools de lectura.
 
-Para trabajo multiarchivo, las tools de escritura devuelven resumen del archivo
-final (`content_preview`, `content_sha256`, tamanos) para que el worker conserve
-contexto entre archivos y no genere cada archivo de forma aislada.
+El worker empieza con una seleccion pequena de tools y puede activar mas con
+`request_tools`. Tambien puede delegar subtareas con `delegate_agent` a
+subagentes built-in como `file-inspector`, `code-reviewer` y `test-runner`, o a
+subagentes Markdown cargados desde `~/.mcp_agents` y `<base_dir>/.mcp_agents`.
 
-El REPL renderiza Markdown cuando `rich` esta disponible. `thinking` esta apagado
-por defecto; se activa con `--show-thinking`, `MCP_CLIENT_SHOW_THINKING=true`,
-`Ctrl+T` o `/thinking on`, y se apaga con:
+## REPL Y Slash Commands
 
-```text
-/thinking off
+```powershell
+python -m src.mcp_client.commands.cli repl --continue
 ```
 
-## Sesiones Persistentes
+Comandos utiles dentro del REPL:
 
-El cliente puede guardar y reanudar conversaciones en SQLite separado de las
-trazas de dataset:
+- `/help`, `/info`, `/health`, `/status`, `/tools`, `/prompts`, `/perms`
+- `/mode auto|direct|team`
+- `/thinking on|off|toggle`
+- `/questions auto|manual|toggle|status`
+- `/output minimal|normal|debug`
+- `/session list`, `/session resume <id>`, `/session new [titulo]`,
+  `/session save [titulo]`, `/session compact [enfoque]`
+- `/pwd`, `/ls`, `/tree`, `/read`, `/head`, `/find`, `/files`
+- `/cache get|set|list`
+
+## Sesiones, Cache Y Trazas
+
+Sesiones persistentes:
 
 ```powershell
 python -m src.mcp_client.commands.cli ask --new-session "analiza el repo"
 python -m src.mcp_client.commands.cli sessions list
-python -m src.mcp_client.commands.cli repl --continue
 python -m src.mcp_client.commands.cli ask --session <session_id> "continua"
 ```
 
-Dentro del REPL:
-
-```text
-/sessions
-/resume <session_id>
-/new investigacion
-/save
-/status
-```
-
-Roadmap de producto CLI: [Roadmap Hermes-Level CLI](docs/hermes_level_cli_roadmap.md)
-
-## KV Cache Local
-
-El cliente incluye un KV cache SQLite local en `.mcp_cache/kv_cache.sqlite`.
-Sirve para guardar datos reutilizables por namespace/key, con TTL opcional.
+KV cache local:
 
 ```powershell
 python -m src.mcp_client.commands.cli cache set repo last_scan "ok" --ttl-seconds 3600
@@ -131,42 +144,44 @@ python -m src.mcp_client.commands.cli cache list --namespace repo
 python -m src.mcp_client.commands.cli cache clear --expired-only
 ```
 
-Tambien esta disponible para el agente como tools locales `kv_get`, `kv_list`,
-`kv_set`, `kv_delete` y `kv_clear_expired`. Las lecturas se marcan como
-`untrusted`; las mutaciones son categoria `write` y respetan permisos y
-confirmacion sensible.
+Trazas SQLite para dataset:
 
-Configuracion:
+```powershell
+python -m src.mcp_client.commands.cli `
+  --trace-capture full `
+  --trace-db-path .mcp_traces/agent_traces.sqlite `
+  ask "implementa una mejora"
 
-- `--kv-cache-db-path` / `MCP_CLIENT_KV_CACHE_DB_PATH`
-- `--no-kv-cache` / `MCP_CLIENT_KV_CACHE_ENABLED=false`
-
-## Medidor De Contexto
-
-El REPL y los flujos agenticos muestran una barra estimada de uso de ventana de
-contexto antes de cada llamada al modelo:
-
-```text
-[context worker step 1] [------------------------] 2% (2,048/131,072 tokens)
+python -m src.mcp_client.commands.cli export-dataset `
+  --db-path .mcp_traces/agent_traces.sqlite `
+  --output datasets/sft_conversation.jsonl
 ```
 
-El calculo es local y aproximado; usa el historial de mensajes, tools expuestas
-y `client_context`. Por defecto usa 131,072 tokens y el cliente envia ese valor
-al servidor como `options.num_ctx` para Ollama. Puedes ajustar u ocultar el
-medidor con:
+Contra servidores no loopback, `--trace-capture full` y
+`--trace-thinking raw` requieren `--allow-remote-sensitive-tracing`.
 
-- `--context-window-tokens 131072`
-- `--no-context-meter`
-- `MCP_CLIENT_CONTEXT_WINDOW_TOKENS`
-- `MCP_CLIENT_SHOW_CONTEXT_METER=false`
+## Permisos Y Seguridad
+
+El runtime local aplica permisos antes de ejecutar cualquier tool:
+
+- `--read-only` apaga write, execute, delete, hardware, media input, web y
+  sandbox execute.
+- `--deny-read`, `--deny-write`, `--deny-execute` reducen capacidades.
+- `--allow-delete`, `--allow-hardware`, `--allow-media-input`, `--allow-web` y
+  `--allow-sandbox-execute` son opt-in para capacidades de mayor riesgo.
+- `--protected-paths` bloquea escritura/borrado en rutas sensibles.
+- `--protected-read-paths` bloquea lectura e inspeccion recursiva de secretos.
+- `--tool-confirmation-mode sensitive` exige aprobacion previa para tools
+  sensibles no incluidas en `--approved-sensitive-tools`.
+
+El servidor HTTP rechaza `--host` no loopback con `--auth-mode off`.
 
 ## Tools Web Aisladas
 
-Las tools `web_search` y `web_fetch` estan apagadas por defecto. Para usarlas con el backend Docker seguro:
+`web_search`, `web_fetch` y `sandbox_run` estan apagadas por defecto. Para
+habilitar busqueda/fetch:
 
 ```powershell
-docker build -f docker/sandbox/Dockerfile -t mcp-sandbox:local .
-
 python -m src.mcp.server `
   --allow-web `
   --sandbox-backend docker `
@@ -174,87 +189,46 @@ python -m src.mcp.server `
   list-tools
 ```
 
-`web_fetch` descarga paginas desde un worker Docker sin salida directa a internet; el egreso pasa por `src.mcp.sandbox.proxy`, que bloquea redes privadas/localhost/metadata cloud y aplica allowlist/denylist de dominios. Si `--web-allowed-domains` queda vacio, se permiten dominios publicos no bloqueados.
-
-Para `web_search`, configura una instancia SearxNG:
-
-```powershell
-$env:MCP_WEB_SEARCH_BASE_URL="http://tu-searxng:8080"
-```
-
-Los resultados web se marcan como `untrusted`; el agente debe usarlos como evidencia, no como instrucciones.
-
-## Limpieza De Artefactos Locales
-
-Los directorios `__pycache__`, `.pytest_cache`, `.pytest_tmp` y
-`pytest-cache-files-*` son artefactos de ejecucion y pueden borrarse. No borres
-`.mcp_cache` ni `.mcp_sessions` salvo que quieras perder cache local y sesiones
-persistentes.
-
-## Seguridad HTTP Y Runtime
-
-El `mcp_server` ahora soporta autenticacion HTTP por Bearer token. Si intentas
-levantarlo fuera de loopback con `--auth-mode off`, el arranque falla por
-seguridad.
-
-Flags principales del servidor:
-
-- `--auth-mode bearer_static`
-- `--auth-static-tokens token1,token2`
-- `--no-auth-for-info` para dejar `/info` y `/nodes` publicos
-- `--private-health` para proteger tambien `/health`
-
-Flags principales del cliente:
-
-- `--server-bearer-token <token>`
-- `--allow-remote-sensitive-tracing` si realmente quieres `--trace-capture full`
-  o `--trace-thinking raw` contra un servidor remoto no loopback
-
-En el runtime local tambien se agregaron dos controles nuevos:
-
-- `--protected-read-paths` / `MCP_PROTECTED_READ_PATHS`: bloquea lectura e
-  inspeccion de rutas sensibles como `.env`, `.git`, `*.pem` y `*.key`
-- `--deny-execute` / `MCP_ALLOW_EXECUTE=false`: deshabilita tools de ejecucion
-  local. Por defecto estan habilitadas para que el agente pueda validar trabajo
-  con Python, tests y comandos de proyecto permitidos.
-- `--tool-confirmation-mode sensitive`: exige aprobacion previa para tools
-  sensibles de escritura, ejecucion, borrado, hardware, media input y sandbox
-- `--approved-sensitive-tools`: allowlist explicita para permitir tools
-  sensibles concretas cuando el modo de confirmacion esta activo
-
-## Tools Git De Solo Lectura
-
-El runtime expone tools Git de inspeccion como `git_status`, `git_diff`, `git_log`,
-`git_show`, `git_branches`, `git_blame` y `git_ls_files`. Todas son de solo
-lectura y funcionan solo cuando la ruta consultada pertenece a un repositorio
-Git dentro de `base_dir`.
-
-Estas tools ejecutan Git sin pager ni diff externo. Las operaciones mutantes
-como `add`, `commit`, `merge`, `rebase`, `reset` o `push` no se exponen todavia
-porque el runtime actual no tiene una capa de confirmacion por herramienta.
-
-## Trazabilidad Y Dataset SQLite
-
-La captura de ejecuciones agenticas puede activarse para guardar planner, worker,
-reviewer, tool calls, correcciones, `thinking` crudo y ejemplos entrenables en
-SQLite:
+El backend seguro esperado es Docker con imagen `mcp-sandbox:local`. Si la
+imagen no existe, el runtime reporta el comando de build esperado:
 
 ```powershell
-python -m src.mcp_client.commands.cli `
-  --trace-capture full `
-  --trace-db-path .mcp_traces/agent_traces.sqlite `
-  ask "implementa una mejora"
+docker build -f docker/sandbox/Dockerfile -t mcp-sandbox:local .
 ```
 
-Contra un servidor remoto no loopback, `--trace-capture full` y
-`--trace-thinking raw` requieren ademas `--allow-remote-sensitive-tracing`.
+`MCP_SANDBOX_BACKEND=local` existe solo para pruebas o desarrollo controlado; no
+ofrece el mismo aislamiento que Docker. `web_search` requiere una instancia
+SearxNG configurada con `MCP_WEB_SEARCH_BASE_URL`.
 
-Luego puedes exportar ejemplos JSONL:
+## Pruebas
 
 ```powershell
-python -m src.mcp_client.commands.cli export-dataset `
-  --db-path .mcp_traces/agent_traces.sqlite `
-  --output datasets/sft_conversation.jsonl
+python -m pytest
 ```
 
-Detalles: [Trazabilidad SQLite Para Dataset](docs/trazabilidad_dataset_sqlite.md)
+Si pytest carga plugins globales incompatibles con Windows, usa:
+
+```powershell
+$env:PYTEST_DISABLE_PLUGIN_AUTOLOAD="1"
+python -m pytest --basetemp C:\tmp\pytest-rag
+```
+
+La suite actual cubre autowrite, consola/prompts, objetivos de consola, data
+tools, prompt context slimming, routing media, permisos de ejecucion del
+runtime, slash submenus, subagentes, team prompt/tool guard, seleccion de modelo
+vision y politica de ejecucion del worker.
+
+## Artefactos Locales
+
+No commitear caches ni sesiones locales:
+
+- `.mcp_cache/`
+- `.mcp_sessions/`
+- `.mcp_traces/`
+- `.mcp_sandbox/`
+- `.pytest_cache/`
+- `.pytest_tmp/`
+
+`__pycache__`, `.pytest_cache`, `.pytest_tmp` y `pytest-cache-files-*` pueden
+borrarse. Borra `.mcp_cache`, `.mcp_sessions` o `.mcp_traces` solo si quieres
+perder cache, sesiones o trazas persistidas.

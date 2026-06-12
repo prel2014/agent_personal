@@ -165,6 +165,25 @@ def load_client_config(args: argparse.Namespace | None = None) -> ClientConfig:
             default=(output_mode == "debug"),
         )
     )
+    context_auto_trim = (
+        getattr(args, "context_auto_trim", None)
+        if getattr(args, "context_auto_trim", None) is not None
+        else read_bool_env("MCP_CLIENT_CONTEXT_AUTO_TRIM", default=True)
+    )
+    context_trim_ratio = float(
+        getattr(args, "context_trim_ratio", None)
+        or os.getenv("MCP_CLIENT_CONTEXT_TRIM_RATIO")
+        or 0.75
+    )
+    if not (0.0 < context_trim_ratio <= 1.0):
+        raise ValueError("MCP_CLIENT_CONTEXT_TRIM_RATIO debe estar en (0.0, 1.0].")
+    context_trim_min_turns = int(
+        getattr(args, "context_trim_min_turns", None)
+        or os.getenv("MCP_CLIENT_CONTEXT_TRIM_MIN_TURNS")
+        or 2
+    )
+    if context_trim_min_turns < 1:
+        raise ValueError("MCP_CLIENT_CONTEXT_TRIM_MIN_TURNS debe ser mayor o igual a 1.")
     auto_session_title = read_bool_env("MCP_CLIENT_AUTO_SESSION_TITLE", default=True)
     allow_remote_sensitive_tracing = (
         getattr(args, "allow_remote_sensitive_tracing", None)
@@ -211,4 +230,7 @@ def load_client_config(args: argparse.Namespace | None = None) -> ClientConfig:
         context_window_tokens=context_window_tokens,
         show_context_meter=show_context_meter,
         output_mode=output_mode,
+        context_auto_trim=context_auto_trim,
+        context_trim_ratio=context_trim_ratio,
+        context_trim_min_turns=context_trim_min_turns,
     )

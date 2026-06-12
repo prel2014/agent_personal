@@ -100,7 +100,7 @@ def handle_compact(ctx: CommandContext, args: list[str]) -> CommandResult:
 
     repl.messages = [
         {
-            "role": "system",
+            "role": "assistant",
             "content": compacted_context_message(summary),
         }
     ]

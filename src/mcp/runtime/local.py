@@ -40,14 +40,23 @@ class LocalToolRuntime:
     def __init__(self, config):
         self.config = config
         self.audit_trail = ToolAuditTrail()
-        self.registry = build_tool_registry(config.kv_cache_enabled)
+        self.registry = build_tool_registry(
+            config.kv_cache_enabled,
+            kv_embedding_enabled=config.kv_embedding_enabled,
+        )
         self.permissions = build_permission_policy(config, self.registry, self.audit_trail)
         self.argument_normalizer = RuntimeArgumentNormalizer(config.base_dir)
         self.project_profile = _detect_project_profile(config.base_dir)
         hardware_tools.configure_media_tools(config)
         web_tools.configure_web_tools(config)
         configure_read_policy(tuple(config.protected_read_paths))
-        configure_kv_store(config.kv_cache_db_path, enabled=config.kv_cache_enabled)
+        configure_kv_store(
+            config.kv_cache_db_path,
+            enabled=config.kv_cache_enabled,
+            embedding_enabled=config.kv_embedding_enabled,
+            embedding_model=config.kv_embedding_model,
+            embedding_ollama_url=config.kv_embedding_ollama_url,
+        )
 
     def info(self) -> dict[str, object]:
         return {

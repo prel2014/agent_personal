@@ -1,0 +1,73 @@
+{
+  "version": 1,
+  "templates": [
+    {
+      "id": "mcp.tool_workflow",
+      "version": 1,
+      "label": "production",
+      "modes": ["tool_workflow", "worker"],
+      "sections": [
+        "system/base.md",
+        "context/runtime_context.md",
+        "context/tools.md",
+        "context/subagents.md",
+        "modes/tool_workflow.md"
+      ],
+      "required_context": ["available_tools", "tool_categories"]
+    },
+    {
+      "id": "mcp.planner",
+      "version": 1,
+      "label": "production",
+      "modes": ["planner"],
+      "sections": [
+        "system/base.md",
+        "context/runtime_context.md",
+        "modes/planner.md"
+      ]
+    },
+    {
+      "id": "mcp.reviewer",
+      "version": 1,
+      "label": "production",
+      "modes": ["reviewer"],
+      "sections": [
+        "system/base.md",
+        "context/runtime_context.md",
+        "context/tools.md",
+        "modes/reviewer.md"
+      ]
+    },
+    {
+      "id": "mcp.final_answer",
+      "version": 1,
+      "label": "production",
+      "modes": ["final_answer"],
+      "sections": [
+        "system/base.md",
+        "context/runtime_context.md",
+        "modes/final_answer.md"
+      ]
+    },
+    {
+      "id": "mcp.compact",
+      "version": 1,
+      "label": "production",
+      "modes": ["compact"],
+      "sections": [
+        "system/base.md",
+        "modes/compact.md"
+      ]
+    },
+    {
+      "id": "mcp.direct_answer",
+      "version": 1,
+      "label": "production",
+      "modes": ["direct_answer"],
+      "sections": [
+        "system/base.md",
+        "modes/direct_answer.md"
+      ]
+    }
+  ]
+}

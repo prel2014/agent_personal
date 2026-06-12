@@ -17,6 +17,7 @@ from ..tools.helpers.code_tools import registry as code_registry
 from ..tools.helpers.git_tools import registry as git_registry
 from ..tools.helpers.hardware_tools import registry as hardware_registry
 from ..tools.helpers.kv_tools import registry as kv_registry
+from ..tools.helpers.kv_search_tools import registry as kv_search_registry
 from ..tools.helpers.system_tools import registry as system_registry
 from ..tools.helpers.web_tools import registry as web_registry
 from ..tools.helpers.data_tools import registry as data_registry
@@ -70,19 +71,25 @@ UNTRUSTED_RESULT_TOOL_NAMES = {
     "git_ls_files",
     "kv_get",
     "kv_list",
+    "kv_search",
     "web_search",
     "web_fetch",
     "determinar_tipo_dato",
 }
 
 
-def build_tool_registry(kv_cache_enabled: bool) -> ToolRegistry:
+def build_tool_registry(
+    kv_cache_enabled: bool,
+    kv_embedding_enabled: bool = False,
+) -> ToolRegistry:
     registry = ToolRegistry()
     registry.extend(system_registry)
     registry.extend(code_registry)
     registry.extend(git_registry)
     if kv_cache_enabled:
         registry.extend(kv_registry)
+        if kv_embedding_enabled:
+            registry.extend(kv_search_registry)
     registry.extend(hardware_registry)
     registry.extend(web_registry)
     registry.extend(data_registry)

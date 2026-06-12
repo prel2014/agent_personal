@@ -29,6 +29,9 @@ class Config:
     approved_sensitive_tools: tuple[str, ...] = ()
     kv_cache_enabled: bool = True
     kv_cache_db_path: str = DEFAULT_KV_CACHE_DB_PATH
+    kv_embedding_enabled: bool = False
+    kv_embedding_model: str = "nomic-embed-text"
+    kv_embedding_ollama_url: str | None = None
     allow_hardware: bool = False
     allow_media_input: bool = False
     vision_model: str | None = None

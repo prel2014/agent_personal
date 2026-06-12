@@ -5,6 +5,8 @@ from typing import Any
 
 from src.mcp_shared.agent_contracts import AgentExecutionContext
 
+from .prompt_context import PromptContextComposer
+
 
 @dataclass(frozen=True)
 class PromptRuleSet:
@@ -39,7 +41,7 @@ class PromptRuleSet:
                     "- No uses herramientas ni tool calls.\n",
                     "- Produce un plan breve, accionable y basado solo en el contexto disponible.\n",
                     "- No intentes inspeccion profunda; delega esa parte al worker.\n",
-                    "- No modifiques archivos.\n",
+                    "- No ejecutes modificaciones en la fase planner. Esta regla limita solo al planner; no prohibe que el worker modifique archivos si el usuario lo pidio y los permisos lo permiten.\n",
                 ]
             )
             return "".join(rules)
@@ -51,6 +53,8 @@ class PromptRuleSet:
                     "- Verifica hechos concretos del trabajo del worker.\n",
                     "- La primera linea debe ser APROBADO o REQUIERE_CAMBIOS.\n",
                     "- No propongas cambios especulativos si no puedes justificarlos con evidencia.\n",
+                    "- Evalua contra la solicitud original del usuario y los permisos reales; no conviertas limitaciones del rol planner en restricciones para el worker.\n",
+                    "- Si el usuario pidio crear, editar, modificar o agregar contenido y el worker uso una tool de escritura permitida con exito, esa escritura es evidencia esperada, no una violacion.\n",
                     self.trust_rules(context),
                 ]
             )
@@ -75,6 +79,7 @@ class PromptRuleSet:
                 "- Usa detected_languages, primary_language y tooling para elegir herramientas del stack.\n",
                 "- Antes de pedir una ruta manualmente, inspecciona con pwd, listdir, find_files o list_tree.\n",
                 "- Si el usuario quiere crear o modificar archivos, usa herramientas de escritura cuando tengas contenido suficiente.\n",
+                "- Si el usuario pide agregar contenido a un archivo existente y write esta permitido, usa appendfile, replace_in_file, replace_lines o writefile segun corresponda; no propongas una copia ni un script externo salvo que una politica real lo bloquee.\n",
                 "- Si el usuario quiere renombrar o mover archivos, usa movefile; no recrees el archivo con writefile.\n",
                 "- Nunca uses writefile para copiar o renombrar imagenes, PDFs u otros binarios.\n",
                 "- Si el usuario quiere leer o extraer informacion visual de imagenes, usa image_describe; no uses readfile para imagenes.\n",
@@ -133,27 +138,4 @@ class PromptRuleSet:
 
     @staticmethod
     def context_payload(context: AgentExecutionContext) -> dict[str, Any]:
-        payload: dict[str, Any] = {
-            "base_dir": context.base_dir,
-            "encoding": context.encoding,
-            "prompt_mode": context.prompt_mode,
-            "agent_role": context.agent_role,
-            "available_tools": context.available_tools,
-            "tool_categories": context.tool_categories,
-            "permissions": context.permissions,
-            "tool_confirmation": context.tool_confirmation,
-            "detected_languages": context.detected_languages,
-            "primary_language": context.primary_language,
-            "tooling": context.tooling,
-            "sandbox": context.sandbox,
-            "media_input": context.media_input,
-            "untrusted_tools": context.untrusted_tools,
-            "location_hint": context.location_hint,
-        }
-        if context.direct_answer_mode:
-            payload["direct_answer_mode"] = True
-        return {
-            key: value
-            for key, value in payload.items()
-            if value not in (None, {}, [])
-        }
+        return PromptContextComposer().payload(context)

@@ -121,7 +121,7 @@ class TracePersistenceHook:
             "name": outcome.name,
             "success": outcome.success,
             "duration_ms": outcome.duration_ms,
-            "error": outcome.result.get("error"),
+            "error": outcome.error,
         }
         if self.settings.capture == "full":
             payload["arguments"] = outcome.arguments

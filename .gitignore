@@ -13,3 +13,4 @@ pytest-cache-files-*/
 .env
 .env.*
 !.env.example
+.md

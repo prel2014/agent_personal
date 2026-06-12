@@ -1,47 +1,74 @@
 # Fases De Refactor Del Cliente
 
-Objetivo: hacer `mcp_client` mas expandible sin fragmentarlo en exceso. La idea es separar composicion, workflows, interfaz interactiva e integraciones, manteniendo la compatibilidad actual mientras se migra por partes.
+Objetivo: hacer `mcp_client` expandible sin fragmentarlo en exceso. La
+estructura actual separa composicion, workflows, interfaz interactiva,
+subagentes e integraciones, manteniendo CLI estable.
 
-## Fase 1. Encapsular el motor de workflows
-- [x] Crear un paquete `workflows/` para concentrar la composicion y ejecucion de flujos.
-- [x] Mover la decision de routing y la orquestacion de ejecucion fuera de `sessions/agent.py`.
-- [x] Mantener `AgentWorkflow` y `AgentTeamOrchestrator` como implementaciones existentes detras de una fachada nueva.
-- [ ] Agregar pruebas de routing entre modo directo, modo team y modo nunca.
+## Fase 1. Motor De Workflows
 
-## Fase 2. Separar la superficie interactiva
+- [x] Crear `workflows/` para composicion y ejecucion de flujos.
+- [x] Mover decision de routing y orquestacion fuera de `sessions/agent.py`.
+- [x] Mantener `AgentWorkflow` y `AgentTeamOrchestrator` detras de una fachada.
+- [x] Cubrir routing directo/team con pruebas (`tests/test_routing_media.py`).
+
+## Fase 2. Superficie Interactiva
+
 - [x] Aislar el ciclo REPL para que no conozca detalles de composicion interna.
-- [x] Mantener `slash/` como adaptador de comandos, no como orquestador.
-- [x] Definir un punto unico para manejar preguntas del usuario, hotkeys y streaming.
+- [x] Mantener `slash/` como adaptador de comandos.
+- [x] Definir puntos separados para preguntas, hotkeys, objetivos y streaming.
+- [x] Agregar slash commands jerarquicos y compatibilidad con nombres legacy.
 
-## Fase 3. Agrupar integraciones
-- [x] Mantener transporte, renderizado, autowrite y trazas como adaptadores independientes.
-- [x] Agrupar los mixins de cache, sesiones y lifecycle del cliente en `integrations/`.
+## Fase 3. Integraciones
+
+- [x] Mantener transporte, renderizado, autowrite y trazas como adaptadores.
+- [x] Agrupar cache, sesiones y lifecycle del cliente en `integrations/`.
 - [x] Reducir imports cruzados entre `sessions/`, `app/` y `agentic/`.
-- [x] Preparar una capa mas limpia para reemplazar adaptadores sin tocar workflows.
+- [x] Preparar reemplazo de adaptadores sin tocar workflows.
 
-## Fase 4. Limpieza de compatibilidad
+## Fase 4. Compatibilidad
+
 - [x] Revisar reexports y aliases antiguos.
-- [x] Retirar rutas viejas solo cuando no haya consumidores.
-- [x] Consolidar nombres y contratos publicos finales.
+- [x] Retirar rutas viejas sin consumidores.
+- [x] Consolidar contratos publicos finales en specs y README.
 
-## Ajustes Posteriores
-- [x] Planner sin tools: si el modelo emite una tool call en una fase sin tools, el cliente la convierte en texto util y no ejecuta la tool.
-- [x] Worker sandbox-first: las tools del worker quedan limitadas al sandbox por defecto y solo salen al host si el usuario lo pide explicitamente.
-- [x] Contexto multiarchivo: las tools de escritura y reemplazo devuelven preview/hash del archivo final para preservar contexto entre cambios.
-- [x] Streaming Markdown: en salida rich se acumula la respuesta y se renderiza como Markdown al final del turno.
-- [x] `thinking` sigue apagado por defecto y se alterna con `Ctrl+T` o `/thinking`.
-- [x] Prueba de regresion para tool calls del planner sin tools.
+## Ajustes Posteriores Implementados
 
-## Hecho En Esta Iteracion
-- [x] `src/mcp_client/workflows/registry.py`
-- [x] `src/mcp_client/workflows/__init__.py`
-- [x] `src/mcp_client/sessions/agent.py` delega la ejecucion al registry de workflows
-- [x] `src/mcp_client/sessions/controller.py`
-- [x] `src/mcp_client/sessions/repl.py` delega el ciclo interactivo al controller
-- [x] `src/mcp_client/integrations/state.py`
-- [x] `src/mcp_client/integrations/__init__.py`
-- [x] `src/mcp_client/app/client.py` consume la capa de integraciones
-- [x] `src/mcp_client/render/terminal.py` ahora imprime la barra de contexto durante la ejecucion
-- [x] Eliminados los shims antiguos de compatibilidad de `agentic/`, `integrations/` y `sessions/`
-- [x] `src/mcp_client/sessions/tool_call_compat.py` filtra tool calls no disponibles
-- [x] `src/mcp_client/integrations/execution.py` conserva Markdown en streaming rich
+- [x] Planner sin tools: tool calls en fase sin tools se convierten en texto
+  util y no se ejecutan.
+- [x] Worker sandbox-first: las tools del worker quedan limitadas al sandbox por
+  defecto y solo salen al host si el usuario lo pide explicitamente.
+- [x] Contexto multiarchivo: tools de escritura/reemplazo devuelven preview,
+  hash y tamanos del archivo final.
+- [x] Streaming Markdown: salida rich acumula respuesta y renderiza Markdown al
+  final del turno.
+- [x] `thinking` apagado por defecto y alternable con `Ctrl+T` o `/thinking`.
+- [x] Prompt registry fuera de handlers (`prompts/registry.json` y secciones
+  Markdown).
+- [x] Seleccion dinamica de tools con `request_tools`.
+- [x] Subagentes built-in y custom con frontmatter Markdown.
+- [x] Medidor de contexto configurable.
+- [x] Modo de salida `minimal|normal|debug`.
+
+## Archivos Clave
+
+- `src/mcp_client/workflows/registry.py`
+- `src/mcp_client/sessions/controller.py`
+- `src/mcp_client/sessions/repl.py`
+- `src/mcp_client/integrations/state.py`
+- `src/mcp_client/integrations/execution.py`
+- `src/mcp_client/app/client.py`
+- `src/mcp_client/slash/registry.py`
+- `src/mcp_client/agentic/team/factory.py`
+- `src/mcp_client/agentic/subagents/`
+- `src/mcp_client/prompts/`
+
+## Pruebas Relevantes Actuales
+
+- `tests/test_console_and_prompts.py`
+- `tests/test_prompt_context_slimming.py`
+- `tests/test_routing_media.py`
+- `tests/test_slash_submenus.py`
+- `tests/test_subagents.py`
+- `tests/test_team_prompt_and_tool_guard.py`
+- `tests/test_worker_execute_policy.py`
+- `tests/test_autowrite_markdown.py`

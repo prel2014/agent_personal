@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from ..tool_results import tool_effective_error, tool_effective_success
+
 
 def preview(value: str, limit: int = 160) -> str:
     if len(value) <= limit:
@@ -27,8 +29,8 @@ def format_tool_result(name: str, result: dict[str, Any], *, detailed: bool) -> 
     if detailed:
         return f"{name}: {preview(json.dumps(result, ensure_ascii=False), 500)}"
 
-    if not result.get("success"):
-        error = str(result.get("error") or "error")
+    if not tool_effective_success(result):
+        error = tool_effective_error(result) or "error"
         return f"{name} error: {preview(error, 120)}"
 
     payload = result.get("result")

@@ -84,7 +84,9 @@ def test_selectable_runtime_activates_requested_tools_without_replanning() -> No
 
 
 def test_factory_gives_worker_small_initial_tool_catalog(tmp_path: Path) -> None:
-    runtime = FakeRuntime(["readfile", "writefile", "python_interpreter"])
+    runtime = FakeRuntime(
+        ["readfile", "writefile", "replace_in_file", "replace_lines", "python_interpreter"]
+    )
     factory = RoleWorkflowFactory(
         config=_client_config(tmp_path),
         runtime=runtime,
@@ -93,6 +95,8 @@ def test_factory_gives_worker_small_initial_tool_catalog(tmp_path: Path) -> None
             {
                 "readfile": READ,
                 "writefile": WRITE,
+                "replace_in_file": WRITE,
+                "replace_lines": WRITE,
                 "python_interpreter": EXECUTE,
             }
         ),
@@ -110,9 +114,29 @@ def test_factory_gives_worker_small_initial_tool_catalog(tmp_path: Path) -> None
     names = _tool_names(workflow.runtime.list_ollama_tools())
     assert "readfile" in names
     assert "writefile" in names
+    assert "replace_in_file" in names
+    assert "replace_lines" in names
+    assert "replace" not in names
     assert "request_tools" in names
     assert "delegate_agent" in names
     assert "python_interpreter" not in names
+
+
+def test_selectable_runtime_exposes_activatable_tools_in_context() -> None:
+    runtime = FakeRuntime(["readfile", "writefile", "python_interpreter"])
+    view = SelectableToolRuntimeView(
+        runtime,
+        initial_tools={"readfile"},
+        subagent_catalog=[],
+        allow_delegate=False,
+    )
+
+    context = view.build_context()
+
+    tool_selection = context["tool_selection"]
+    assert tool_selection["active_tools"] == ["readfile"]
+    assert "python_interpreter" in tool_selection["activatable_tools"]
+    assert "python_interpreter" in tool_selection["inactive_tools"]
 
 
 class FakeRuntime:
