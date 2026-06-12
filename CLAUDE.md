@@ -23,6 +23,13 @@ rag-agent repl                            # REPL interactivo
 rag-agent ask "prompt"                    # single shot
 rag-agent setup                           # crear DBs y directorios locales
 rag-agent doctor                          # validar configuración
+rag-agent skills list                     # listar skills disponibles
+rag-agent skills show <nombre>            # ver un skill
+rag-agent ask --skill <nombre> "prompt"   # activar skill por sesión
+rag-agent memory list                     # listar memorias
+rag-agent memory add <clave> <valor>      # guardar memoria de proyecto
+rag-agent memory search <query>           # buscar memoria
+rag-agent memory forget <clave>           # borrar memoria
 ```
 
 **Ejecutar el servidor:**
@@ -52,12 +59,13 @@ mcp_client  ──HTTP──►  mcp_server  ──HTTP──►  Ollama (LLM)
 ### `src/mcp_client` — Cliente/CLI
 Dueño del ciclo de vida del usuario: CLI, REPL, sesiones persistentes, slash commands, autowrite de código desde Markdown, y el workflow agentico (Planner → Worker → Reviewer).
 
-- `agentic/` — orquestación: roles, políticas, team, subagentes, trazas
+- `agentic/` — orquestación: roles, políticas, team, subagentes, trazas, skills, memoria
 - `sessions/` — persistencia SQLite de conversaciones
 - `slash/` — lexer, parser, router, completion de slash commands
 - `autowrite/` — extrae bloques de código de respuestas Markdown e infiere rutas
 - `transport/` — HTTP hacia `mcp_server`
 - `prompts/` — prompts de routing y compactación de contexto
+- `workflows/` — registry de workflows y trazado de ejecuciones
 
 ### `src/mcp_server` — Orquestador HTTP
 Dueño del routing hacia nodos Ollama: auth Bearer estática, discovery LAN, auto-promoción de nodos, selección por rol/prioridad, rendering de prompts desde `prompts/registry.json`, streaming NDJSON con heartbeat.
@@ -109,6 +117,25 @@ tools: [pwd, listdir, readfile, search_code]
 Eres auditor. Revisa riesgos...
 ```
 
+### Skills (Markdown)
+Se cargan desde `~/.mcp_skills/` o `<base_dir>/.mcp_skills/`. Un skill inyecta una directiva en el prompt del agente para la sesión activa:
+```markdown
+---
+name: concise-responder
+description: Responde siempre en 3 líneas o menos
+scope: all
+---
+Responde siempre con un máximo de 3 líneas. Sé directo.
+```
+Se activa con `--skill <nombre>` o con `/skill activate <nombre>` en el REPL.
+
+### Memoria Persistente
+`MemoryStore` persiste pares clave-valor en SQLite (sobre `SQLiteKVCacheStore`) en dos scopes:
+- **Proyecto**: `<base_dir>/.mcp_memory/` — preferencias del proyecto actual.
+- **Usuario**: `~/.mcp_memory/` — preferencias globales del usuario.
+
+La memoria se inyecta automáticamente en el contexto del agente. Si Ollama expone `nomic-embed-text`, la búsqueda usa embeddings; si no, cae back a BM25 textual. Deshabilitar con `--no-memory`.
+
 ### Specification-Driven Development (SDD)
 Cada subsistema mayor tiene un `.sdd.md` junto al código que define sus límites: qué posee, qué no posee, interfaces públicas, reglas de comportamiento, y mapa de tests. Jerarquía de autoridad ante conflictos: **Usuario → Código actual → Spec → README → Roadmaps**.
 
@@ -124,6 +151,8 @@ Los specs `.sdd.md` están en:
 | `.mcp_sessions/` | Conversaciones SQLite (sin campo `thinking`) |
 | `.mcp_traces/` | Eventos agenticos SQLite (si `trace-capture` activo) |
 | `.mcp_cache/` | KV cache SQLite con TTL |
+| `.mcp_memory/` | Memoria de proyecto SQLite (clave-valor persistente) |
+| `~/.mcp_memory/` | Memoria de usuario SQLite (global entre proyectos) |
 | `.mcp_sandbox/` | Archivos del sandbox web |
 
 ## Convenciones de código

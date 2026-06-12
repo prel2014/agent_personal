@@ -107,6 +107,31 @@ El worker empieza con una seleccion pequena de tools y puede activar mas con
 subagentes built-in como `file-inspector`, `code-reviewer` y `test-runner`, o a
 subagentes Markdown cargados desde `~/.mcp_agents` y `<base_dir>/.mcp_agents`.
 
+## Skills Y Memoria
+
+Skills son archivos `.md` con frontmatter YAML que inyectan una directiva en el
+agente. Se cargan desde `~/.mcp_skills/` y `<base_dir>/.mcp_skills/`.
+
+```powershell
+rag-agent skills list
+rag-agent skills show concise-responder
+rag-agent ask --skill concise-responder "resume el repo"
+```
+
+Memoria persistente por proyecto (`<base_dir>/.mcp_memory/`) y por usuario
+(`~/.mcp_memory/`), almacenadas en SQLite:
+
+```powershell
+rag-agent memory list
+rag-agent memory add pref_lang "preferir Python sobre Bash"
+rag-agent memory search "lenguaje preferido"
+rag-agent memory forget pref_lang
+rag-agent memory clear
+```
+
+Usa `--no-memory` para desactivar la memoria en una sesion especifica.
+La busqueda semantica se activa si Ollama expone el modelo `nomic-embed-text`.
+
 ## REPL Y Slash Commands
 
 ```powershell
@@ -124,6 +149,10 @@ Comandos utiles dentro del REPL:
   `/session save [titulo]`, `/session compact [enfoque]`
 - `/pwd`, `/ls`, `/tree`, `/read`, `/head`, `/find`, `/files`
 - `/cache get|set|list`
+- `/skills`, `/skills list`, `/skill show <nombre>`,
+  `/skill activate <nombre>`, `/skill off`
+- `/memory`, `/memory add <clave> <valor>`, `/memory search <query>`,
+  `/memory forget <clave>`, `/memory user add <clave> <valor>`
 
 ## Sesiones, Cache Y Trazas
 

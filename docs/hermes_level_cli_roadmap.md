@@ -42,19 +42,28 @@ Pendiente:
 
 ## Hito 2: Skills Y Memoria
 
-Objetivo: convertir procedimientos repetibles en capacidades versionadas.
+Implementado:
 
-Parcialmente cubierto por subagentes Markdown, pero no por un sistema completo
-de skills.
+- Carpeta `~/.mcp_skills/` y `<base_dir>/.mcp_skills/` con archivos `.md`
+  como formato de skill (frontmatter YAML + directiva).
+- CLI: `skills list`, `skills show <nombre>`.
+- Flag `--skill <nombre>` para activar un skill desde el arranque.
+- Slash commands `/skills`, `/skills list`, `/skill show <nombre>`,
+  `/skill activate <nombre>`, `/skill off`.
+- Memoria de proyecto (`<base_dir>/.mcp_memory/`) y de usuario
+  (`~/.mcp_memory/`) persistidas en SQLite.
+- CLI: `memory list|add|forget|search|clear` y
+  `memory user add|forget`.
+- Slash commands `/memory`, `/memory list`, `/memory add <clave> <valor>`,
+  `/memory search <query>`, `/memory forget <clave>`,
+  `/memory user add <clave> <valor>`, `/memory user forget <clave>`.
+- Flag `--no-memory` para desactivar memoria en una sesion.
+- Busqueda semantica opcional via embeddings (Ollama + `nomic-embed-text`).
+- Memoria inyectada automaticamente en el contexto del agente.
 
 Pendiente:
 
-- Carpeta `skills/` con formato `SKILL.md`.
-- Comandos `skills list|show|create|install`.
-- Carga explicita por CLI: `--skill <name>`.
-- Slash commands `/skills` y `/skill <name>`.
-- Memoria de preferencias por proyecto y usuario.
-- Busqueda de memoria sin exponer secretos.
+- Documentar recipes de uso de skills por tipo de proyecto.
 
 ## Hito 3: Multi-Provider
 
